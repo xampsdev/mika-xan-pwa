@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper: Validates exclusive administrator account (Xan)
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'xampsbeatz@gmail.com';
+    }
+
+    // Pet Photos & Vouchers Storage
+    // Public read access for display across client review and admin dashboard.
+    // Write permitted for client uploads under 5MB with valid image MIME type.
+    // Deletion restricted strictly to admins.
+    match /pets/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if request.resource.size < 5 * 1024 * 1024
+                            && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
+    }
+
+    // Default Fallback: Deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

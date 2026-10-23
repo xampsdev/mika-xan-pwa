@@ -1,0 +1,6 @@
+{
+  "name": "Mika & Xan - Pet Boarding PWA",
+  "description": "Pet Boarding and Daycare Management PWA with multi-tab offline Firestore synchronization, 22-field normalized intake, and iOS Safari Web Push standalone support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
