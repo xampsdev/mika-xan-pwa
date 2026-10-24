@@ -11,14 +11,20 @@
     "minimal-ui"
   ],
   "orientation": "portrait",
-  "background_color": "#042f2e",
-  "theme_color": "#0f766e",
+  "background_color": "#FAF7F2",
+  "theme_color": "#D96B43",
   "categories": [
     "lifestyle",
     "utilities",
     "business"
   ],
   "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
     {
       "src": "/pwa-192x192.png",
       "sizes": "192x192",

@@ -31,10 +31,12 @@ import {
   Loader2,
   Users,
   X,
+  Download,
 } from 'lucide-react';
 import type { Pet, Tutor, Stay } from '@/types/schema';
 import { PetDetailModal } from '@/components/PetDetailModal';
 import { NotificationManager } from '@/components/NotificationManager';
+import { downloadGeneratedIcons } from '@/lib/pwaIconGenerator';
 
 // Exclusive Administrator Account (Xan)
 export const ALLOWED_ADMIN_EMAIL = 'xampsbeatz@gmail.com';
@@ -58,6 +60,7 @@ export const AdminDashboard: React.FC = () => {
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [changePasswordFeedback, setChangePasswordFeedback] = useState<string | null>(null);
+  const [downloadingIcons, setDownloadingIcons] = useState<boolean>(false);
 
   // Firestore Real-time Collections State
   const [pets, setPets] = useState<Pet[]>([]);
@@ -255,6 +258,18 @@ export const AdminDashboard: React.FC = () => {
     }
     setIsLocalAdminBypass(false);
     setCurrentUser(null);
+  };
+
+  const handleDownloadPwaIcons = async () => {
+    setDownloadingIcons(true);
+    try {
+      await downloadGeneratedIcons();
+    } catch (err) {
+      console.error('Failed to download icons:', err);
+      alert('Falha ao gerar e baixar ícones.');
+    } finally {
+      setDownloadingIcons(false);
+    }
   };
 
   // PetId -> Current Active or Pending Stay
@@ -569,7 +584,22 @@ export const AdminDashboard: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={handleDownloadPwaIcons}
+            disabled={downloadingIcons}
+            className="min-h-[38px] inline-flex items-center gap-1.5 px-3 rounded-xl bg-white hover:bg-[#FAF7F2] border border-[#E7E2D8] text-[#78716C] hover:text-[#1C1917] text-xs font-semibold transition"
+            title="Baixar os 4 ícones PNG gerados em alta resolução a partir do icon.svg"
+          >
+            {downloadingIcons ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D96B43]" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-[#D96B43]" />
+            )}
+            <span className="hidden sm:inline">Baixar Ícones PNG</span>
+            <span className="sm:hidden">Ícones PNG</span>
+          </button>
+
           <button
             onClick={() => setShowChangePasswordModal(true)}
             className="min-h-[38px] inline-flex items-center gap-1.5 px-3 rounded-xl bg-white hover:bg-[#FAF7F2] border border-[#E7E2D8] text-[#78716C] hover:text-[#1C1917] text-xs font-semibold transition"

@@ -25,8 +25,8 @@ export default defineConfig(() => {
           short_name: 'Mika & Xan',
           description:
             'Sistema de gestão e ficha cadastral para hospedagem pet com suporte offline e histórico de estadias.',
-          theme_color: '#0f766e',
-          background_color: '#042f2e',
+          theme_color: '#D96B43',
+          background_color: '#FAF7F2',
           display: 'standalone',
           display_override: ['standalone', 'minimal-ui'],
           start_url: '/',
@@ -34,6 +34,12 @@ export default defineConfig(() => {
           orientation: 'portrait',
           categories: ['lifestyle', 'utilities', 'business'],
           icons: [
+            {
+              src: '/icon.svg',
+              sizes: 'any',
+              type: 'image/svg+xml',
+              purpose: 'any maskable',
+            },
             {
               src: '/pwa-192x192.png',
               sizes: '192x192',
@@ -131,10 +137,7 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0f766e" />
-      <stop offset="100%" stop-color="#115e59" />
+      <stop offset="0%" stop-color="#D96B43" />
+      <stop offset="100%" stop-color="#B8542E" />
     </linearGradient>
     <linearGradient id="pawGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fbbf24" />
-      <stop offset="100%" stop-color="#f59e0b" />
+      <stop offset="0%" stop-color="#FFFDF7" />
+      <stop offset="100%" stop-color="#FDF3E7" />
     </linearGradient>
   </defs>
   
@@ -14,7 +14,7 @@
   <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
   
   <!-- Subtle roof / shelter outline -->
-  <path d="M 120 220 L 256 110 L 392 220" fill="none" stroke="#5eead4" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
+  <path d="M 120 220 L 256 110 L 392 220" fill="none" stroke="#FDBA74" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
   
   <!-- Mika & Xan Paw Print -->
   <!-- Main Pad -->
@@ -27,8 +27,8 @@
   <ellipse cx="327" cy="245" rx="26" ry="38" transform="rotate(20 327 245)" fill="url(#pawGrad)" />
   
   <!-- Heart Accent inside Main Pad -->
-  <path d="M 256 342 C 256 342 240 330 234 322 C 226 312 232 300 242 300 C 248 300 253 304 256 308 C 259 304 264 300 270 300 C 280 300 286 312 278 322 C 272 330 256 342 256 342 Z" fill="#0f766e" />
+  <path d="M 256 342 C 256 342 240 330 234 322 C 226 312 232 300 242 300 C 248 300 253 304 256 308 C 259 304 264 300 270 300 C 280 300 286 312 278 322 C 272 330 256 342 256 342 Z" fill="#D96B43" />
   
-  <!-- Brand text ribbon "M & X" -->
-  <text x="256" y="440" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="800" fill="#ccfbf1" text-anchor="middle" letter-spacing="4">MIKA &amp; XAN</text>
+  <!-- Brand text ribbon "MIKA & XAN" -->
+  <text x="256" y="440" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="800" fill="#FFFDF7" text-anchor="middle" letter-spacing="4">MIKA &amp; XAN</text>
 </svg>
