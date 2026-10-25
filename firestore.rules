@@ -37,6 +37,12 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // 5. Pet Admin Internal Notes Collection (Private to Admin)
+    // Isolated from the public pets collection so clients cannot query internal notes.
+    match /pet_admin_notes/{petId} {
+      allow read, write: if isAdmin();
+    }
+
     // Default Fallback: Deny all other access
     match /{document=**} {
       allow read, write: if false;

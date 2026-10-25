@@ -9,6 +9,9 @@ import {
   db,
   collection,
   onSnapshot,
+  doc,
+  updateDoc,
+  serverTimestamp,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
@@ -458,6 +461,24 @@ export const AdminDashboard: React.FC = () => {
     setEmailInput('');
     setPasswordInput('');
     setAuthError(null);
+  };
+
+  const handleApproveStay = async (stayId: string) => {
+    try {
+      await updateDoc(doc(db, 'stays', stayId), {
+        status: 'active',
+        updatedAt: serverTimestamp(),
+      });
+      playNotificationChime();
+      setDeleteToast({
+        type: 'success',
+        message: 'Hospedagem aprovada com sucesso! Check-in iniciado.',
+      });
+      setTimeout(() => setDeleteToast(null), 4000);
+    } catch (err: any) {
+      console.error('Failed to approve stay:', err);
+      alert('Erro ao aprovar estadia: ' + (err?.message || 'Erro desconhecido'));
+    }
   };
 
   const handleDownloadPwaIcons = async () => {
@@ -1155,30 +1176,43 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-3.5 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPet(pet);
-                      setIsDetailModalOpen(true);
-                    }}
-                    className="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] border border-[#7b93c2] text-[#1E293B] text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
-                  >
-                    <span>Ver Ficha (22 Campos)</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPetToDelete(pet);
-                    }}
-                    className="min-h-[44px] px-3.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FCA5A5] text-[#991B1B] text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer shadow-sm border border-[#FECACA]"
-                    title={`Excluir ficha de ${pet.nameAndBreed}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span className="hidden xs:inline">Excluir</span>
-                  </button>
+                <div className="mt-3.5 space-y-2">
+                  {isPending && latestStay && (
+                    <button
+                      type="button"
+                      onClick={() => handleApproveStay(latestStay.id)}
+                      className="w-full min-h-[44px] px-3.5 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] active:scale-[0.99] border border-[#7b93c2] text-[#1E293B] text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-[#1E293B]" />
+                      <span>Aprovar Hospedagem (Iniciar Check-in)</span>
+                    </button>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPet(pet);
+                        setIsDetailModalOpen(true);
+                      }}
+                      className="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl bg-white hover:bg-[#FAF8F9] border border-[#dec2cb] text-[#1E293B] text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+                    >
+                      <span>Ver Ficha (22 Campos)</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-[#2D3E5E]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPetToDelete(pet);
+                      }}
+                      className="min-h-[44px] px-3.5 rounded-xl bg-[#FEE2E2] hover:bg-[#FCA5A5] text-[#991B1B] text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer shadow-sm border border-[#FECACA]"
+                      title={`Excluir ficha de ${pet.nameAndBreed}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span className="hidden xs:inline">Excluir</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );

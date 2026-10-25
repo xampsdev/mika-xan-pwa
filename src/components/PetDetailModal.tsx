@@ -11,6 +11,7 @@ import {
   where,
   onSnapshot,
   doc,
+  setDoc,
   updateDoc,
   addDoc,
   serverTimestamp,
@@ -29,6 +30,9 @@ import {
   Loader2,
   ShieldAlert,
   Trash2,
+  FileText,
+  Lock,
+  Save,
 } from 'lucide-react';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
 import { cascadeDeletePet } from '@/utils/petDeletion';
@@ -55,6 +59,16 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
   const [stays, setStays] = useState<Stay[]>([]);
   const [loadingStays, setLoadingStays] = useState<boolean>(true);
   const [staysMetadataFromCache, setStaysMetadataFromCache] = useState<boolean>(false);
+
+  // Private Admin Internal Notes State (pet_admin_notes collection)
+  const [adminNotes, setAdminNotes] = useState<string>('');
+  const [adminNotesUpdatedAt, setAdminNotesUpdatedAt] = useState<Date | null>(null);
+  const [savingAdminNotes, setSavingAdminNotes] = useState<boolean>(false);
+  const [adminNotesFeedback, setAdminNotesFeedback] = useState<string | null>(null);
+
+  // Per-Stay Admin Notes State (Stay.adminStayNotes)
+  const [editingStayNotes, setEditingStayNotes] = useState<Record<string, string>>({});
+  const [savingStayNoteId, setSavingStayNoteId] = useState<string | null>(null);
 
   // Photo Upload State
   const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
@@ -94,8 +108,14 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
       (snapshot: any) => {
         setStaysMetadataFromCache(Boolean(snapshot.metadata?.fromCache));
         const staysList: Stay[] = [];
+        const notesMap: Record<string, string> = {};
+
         snapshot.forEach((docSnap: any) => {
-          staysList.push({ id: docSnap.id, ...docSnap.data() } as Stay);
+          const stayData = { id: docSnap.id, ...docSnap.data() } as Stay;
+          staysList.push(stayData);
+          if (stayData.adminStayNotes !== undefined) {
+            notesMap[stayData.id] = stayData.adminStayNotes;
+          }
         });
 
         staysList.sort(
@@ -103,6 +123,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
         );
 
         setStays(staysList);
+        setEditingStayNotes((prev) => ({ ...notesMap, ...prev }));
         setLoadingStays(false);
       },
       (error: any) => {
@@ -114,7 +135,78 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     return () => unsubscribe();
   }, [pet, isOpen]);
 
+  // Subscribe to private Admin Internal Notes (pet_admin_notes/{petId})
+  useEffect(() => {
+    if (!pet || !isOpen) return;
+
+    const unsubAdminNotes = onSnapshot(
+      doc(db, 'pet_admin_notes', pet.id),
+      { includeMetadataChanges: true },
+      (docSnap: any) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setAdminNotes(data.internalNotes || '');
+          if (data.updatedAt?.toDate) {
+            setAdminNotesUpdatedAt(data.updatedAt.toDate());
+          } else if (data.updatedAt) {
+            setAdminNotesUpdatedAt(new Date(data.updatedAt));
+          }
+        } else {
+          setAdminNotes('');
+          setAdminNotesUpdatedAt(null);
+        }
+      },
+      (err: any) => {
+        console.warn('Admin internal notes listener notice:', err);
+      }
+    );
+
+    return () => unsubAdminNotes();
+  }, [pet, isOpen]);
+
   if (!isOpen || !pet) return null;
+
+  // Handle saving fixed Admin Internal Notes for the Pet
+  const handleSaveAdminNotes = async () => {
+    if (!pet) return;
+    setSavingAdminNotes(true);
+    setAdminNotesFeedback(null);
+    try {
+      await setDoc(
+        doc(db, 'pet_admin_notes', pet.id),
+        {
+          petId: pet.id,
+          internalNotes: adminNotes,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      setAdminNotesFeedback('Observação salva com sucesso!');
+      setAdminNotesUpdatedAt(new Date());
+      setTimeout(() => setAdminNotesFeedback(null), 3500);
+    } catch (err: any) {
+      console.error('Failed to save admin internal notes:', err);
+      alert('Erro ao salvar observação interna: ' + (err?.message || 'Erro de permissão'));
+    } finally {
+      setSavingAdminNotes(false);
+    }
+  };
+
+  // Handle saving per-stay Admin Notes
+  const handleSaveStayAdminNotes = async (stayId: string, notes: string) => {
+    setSavingStayNoteId(stayId);
+    try {
+      await updateDoc(doc(db, 'stays', stayId), {
+        adminStayNotes: notes,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err: any) {
+      console.error('Failed to update stay admin notes:', err);
+      alert('Erro ao salvar anotação desta estadia: ' + (err?.message || 'Erro desconhecido'));
+    } finally {
+      setSavingStayNoteId(null);
+    }
+  };
 
   // Handle Photo Upload (Direct compressed DataURL to Firestore)
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,7 +234,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     }
   };
 
-  // Delete Pet and Cascade Stays
+  // Delete Pet and Cascade Stays + Admin Notes
   const handleDeletePet = async () => {
     if (!pet) return;
     setIsDeleting(true);
@@ -164,11 +256,12 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     }
   };
 
-  // Update Stay Status
+  // Update Stay Status (Stay Approval Workflow)
   const handleUpdateStayStatus = async (stayId: string, newStatus: StayStatus) => {
     try {
-      const updates: Partial<Stay> = {
+      const updates: Partial<Stay> & { updatedAt?: any } = {
         status: newStatus,
+        updatedAt: serverTimestamp(),
       };
       if (newStatus === 'completed') {
         updates.actualCheckOutDate = new Date().toISOString();
@@ -215,6 +308,10 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     Boolean(pet.pastSevereIllnessOrChronic?.trim()) ||
     !pet.vaccinationUpToDate ||
     pet.destroysOrIngestsObjects;
+
+  // Has at least one approved stay (active or completed)
+  const hasApprovedStay = stays.some((s) => s.status === 'active' || s.status === 'completed');
+  const pendingStay = stays.find((s) => s.status === 'pending');
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in">
@@ -363,6 +460,108 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* ─────────────────────────────────────────────────────────────
+                  Observações Fixas do Admin sobre o Cão (pet_admin_notes)
+                  Private to Admin - Zero Client Exposure
+              ───────────────────────────────────────────────────────────── */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#dec2cb]/80 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#dec2cb]/60 pb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#f7cac9] to-[#92a8d1] flex items-center justify-center text-[#1E293B] border border-[#dec2cb]">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-[#1E293B] uppercase tracking-wider">
+                          Observações Fixas do Admin sobre o Cão
+                        </h4>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#FAF8F9] border border-[#dec2cb] text-[#64748B]">
+                          Privado
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#64748B]">
+                        Gravado exclusivamente na coleção isolada <code className="font-mono text-[#1E293B]">pet_admin_notes</code>.
+                      </p>
+                    </div>
+                  </div>
+
+                  {adminNotesUpdatedAt && (
+                    <span className="text-[10px] font-semibold text-[#64748B] self-start sm:self-auto bg-[#FAF8F9] px-2.5 py-1 rounded-lg border border-[#dec2cb]">
+                      Salvo em {adminNotesUpdatedAt.toLocaleDateString('pt-BR')} às {adminNotesUpdatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+
+                {hasApprovedStay ? (
+                  <div className="space-y-2.5">
+                    <textarea
+                      rows={4}
+                      value={adminNotes}
+                      onChange={(e) => setAdminNotes(e.target.value)}
+                      placeholder="Ex: Cãozinho dócil, mas prefere comer isolado de outros machos. Gosta de carinho atrás da orelha antes de dormir. Tutor é pontual."
+                      className="w-full min-h-[100px] text-base p-3.5 rounded-xl border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition leading-relaxed"
+                    />
+
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        {adminNotesFeedback && (
+                          <span className="text-xs font-bold text-[#133E26] flex items-center gap-1 bg-[#d2e3d8] px-2.5 py-1 rounded-lg border border-[#a3cbb1]">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#133E26]" />
+                            <span>{adminNotesFeedback}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={savingAdminNotes}
+                        onClick={handleSaveAdminNotes}
+                        className="min-h-[44px] px-5 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] active:scale-[0.99] disabled:opacity-50 text-[#1E293B] font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm border border-[#7b93c2] cursor-pointer"
+                      >
+                        {savingAdminNotes ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1E293B]" />
+                            <span>Salvando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-3.5 h-3.5 text-[#1E293B]" />
+                            <span>Salvar Observação do Cão</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-[#FAF8F9] border border-[#dec2cb] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <Lock className="w-4 h-4 text-[#64748B] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-[#1E293B]">
+                          Anotações internas bloqueadas até a aprovação da hospedagem
+                        </p>
+                        <p className="text-[11px] text-[#64748B] mt-0.5">
+                          {pendingStay
+                            ? 'Aprove a solicitação de check-in pendente para liberar o campo de anotações internas deste cão.'
+                            : 'Inicie ou lance uma nova estadia para liberar o campo de anotações internas deste cão.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {pendingStay && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStayStatus(pendingStay.id, 'active')}
+                        className="min-h-[44px] px-4 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] active:scale-[0.99] text-[#1E293B] font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm border border-[#7b93c2] shrink-0 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-[#1E293B]" />
+                        <span>Aprovar Hospedagem (Iniciar Check-in)</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Photo & Uploader */}
               <div className="p-4 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -631,7 +830,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                           <span>Zona de Perigo • Excluir Cadastro</span>
                         </h4>
                         <p className="text-[11px] text-[#7F1D1D] mt-0.5 font-medium">
-                          Exclui permanentemente a ficha deste pet e todas as suas estadias do Firestore.
+                          Exclui permanentemente a ficha deste pet, histórico de estadias e anotações internas.
                         </p>
                       </div>
                       <button
@@ -752,7 +951,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                   Nenhuma estadia registrada ainda para este pet.
                 </div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {stays.map((stay) => {
                     const isActive = stay.status === 'active';
                     const isPending = stay.status === 'pending';
@@ -761,7 +960,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                     return (
                       <div
                         key={stay.id}
-                        className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        className={`p-4 rounded-2xl border transition flex flex-col justify-between gap-3 ${
                           isActive
                             ? 'bg-[#d2e3d8]/60 border-[#a3cbb1]'
                             : isPending
@@ -769,68 +968,116 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                               : 'bg-[#FAF8F9] border-[#dec2cb]/60'
                         }`}
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                isActive
-                                  ? 'bg-[#133E26] text-white'
-                                  : isPending
-                                    ? 'bg-[#92a8d1] text-[#1E293B] border border-[#7b93c2]'
-                                    : 'bg-stone-200 text-[#1E293B]'
-                              }`}
-                            >
-                              {isActive ? 'Estadia Ativa' : isPending ? 'Check-in Pendente' : 'Concluída'}
-                            </span>
-                            <span className="text-[11px] text-[#64748B] font-mono">
-                              ID: {stay.id.slice(0, 8)}
-                            </span>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                  isActive
+                                    ? 'bg-[#133E26] text-white'
+                                    : isPending
+                                      ? 'bg-[#92a8d1] text-[#1E293B] border border-[#7b93c2]'
+                                      : 'bg-stone-200 text-[#1E293B]'
+                                }`}
+                              >
+                                {isActive ? 'Estadia Ativa' : isPending ? 'Check-in Pendente' : 'Concluída'}
+                              </span>
+                              <span className="text-[11px] text-[#64748B] font-mono">
+                                ID: {stay.id.slice(0, 8)}
+                              </span>
+                            </div>
+
+                            <div className="text-xs text-[#1E293B] font-semibold flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <span>
+                                Entrada: {new Date(stay.checkInDate).toLocaleString('pt-BR')}
+                              </span>
+                              <span>→</span>
+                              <span>
+                                Saída: {new Date(stay.checkOutDate).toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+
+                            {stay.specialStayNotes && (
+                              <p className="text-xs text-[#64748B] italic">
+                                "{stay.specialStayNotes}"
+                              </p>
+                            )}
                           </div>
 
-                          <div className="text-xs text-[#1E293B] font-semibold flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                            <span>
-                              Entrada: {new Date(stay.checkInDate).toLocaleString('pt-BR')}
-                            </span>
-                            <span>→</span>
-                            <span>
-                              Saída: {new Date(stay.checkOutDate).toLocaleString('pt-BR')}
-                            </span>
+                          {/* Status Actions (Stay Approval Workflow) */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isPending && (
+                              <button
+                                onClick={() => handleUpdateStayStatus(stay.id, 'active')}
+                                className="w-full sm:w-auto min-h-[44px] px-4 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] active:scale-[0.99] text-[#1E293B] text-xs font-bold transition shadow-sm border border-[#7b93c2] flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-[#1E293B]" />
+                                <span>Aprovar Hospedagem (Iniciar Check-in)</span>
+                              </button>
+                            )}
+
+                            {isActive && (
+                              <button
+                                onClick={() => handleUpdateStayStatus(stay.id, 'completed')}
+                                className="w-full sm:w-auto min-h-[44px] px-4 rounded-xl bg-white border border-[#dec2cb] hover:bg-[#FAF8F9] text-[#1E293B] text-xs font-bold transition shadow-sm"
+                              >
+                                Finalizar Estadia (Check-out)
+                              </button>
+                            )}
+
+                            {isCompleted && (
+                              <span className="text-xs text-[#133E26] flex items-center gap-1 font-bold">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-[#133E26]" />
+                                Concluída
+                              </span>
+                            )}
                           </div>
-
-                          {stay.specialStayNotes && (
-                            <p className="text-xs text-[#64748B] italic">
-                              "{stay.specialStayNotes}"
-                            </p>
-                          )}
                         </div>
 
-                        {/* Status Change Buttons */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          {isPending && (
-                            <button
-                              onClick={() => handleUpdateStayStatus(stay.id, 'active')}
-                              className="w-full sm:w-auto min-h-[44px] px-4 rounded-xl bg-[#2D3E5E] hover:bg-[#1E293B] text-white text-xs font-bold transition shadow-sm"
-                            >
-                              Confirmar Entrada (Ativar)
-                            </button>
-                          )}
-
-                          {isActive && (
-                            <button
-                              onClick={() => handleUpdateStayStatus(stay.id, 'completed')}
-                              className="w-full sm:w-auto min-h-[44px] px-4 rounded-xl bg-white border border-[#dec2cb] hover:bg-[#FAF8F9] text-[#1E293B] text-xs font-bold transition shadow-sm"
-                            >
-                              Finalizar Estadia (Check-out)
-                            </button>
-                          )}
-
-                          {isCompleted && (
-                            <span className="text-xs text-[#133E26] flex items-center gap-1 font-bold">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-[#133E26]" />
-                              Concluída
-                            </span>
-                          )}
-                        </div>
+                        {/* Anotações desta Hospedagem (Stay.adminStayNotes) - Unlocked for Approved Stays */}
+                        {(isActive || isCompleted) && (
+                          <div className="mt-2 pt-2.5 border-t border-[#dec2cb]/60 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-bold text-[#1E293B] flex items-center gap-1.5">
+                                <FileText className="w-3.5 h-3.5 text-[#2D3E5E]" />
+                                <span>Anotações desta Hospedagem (Admin)</span>
+                              </label>
+                              {savingStayNoteId === stay.id ? (
+                                <span className="text-[10px] text-[#64748B] flex items-center gap-1">
+                                  <Loader2 className="w-3 h-3 animate-spin" /> Salvando...
+                                </span>
+                              ) : null}
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={editingStayNotes[stay.id] ?? (stay.adminStayNotes || '')}
+                              onChange={(e) =>
+                                setEditingStayNotes((prev) => ({
+                                  ...prev,
+                                  [stay.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Como foi esta hospedagem? Alimentação, comportamento, passeios, medicação administrada..."
+                              className="w-full min-h-[64px] text-xs p-2.5 rounded-xl border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition leading-relaxed"
+                            />
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                disabled={savingStayNoteId === stay.id}
+                                onClick={() =>
+                                  handleSaveStayAdminNotes(
+                                    stay.id,
+                                    editingStayNotes[stay.id] ?? (stay.adminStayNotes || '')
+                                  )
+                                }
+                                className="min-h-[36px] px-3.5 rounded-xl bg-white hover:bg-[#FAF8F9] border border-[#c5b9cd] text-[#1E293B] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              >
+                                <Save className="w-3.5 h-3.5 text-[#2D3E5E]" />
+                                <span>Salvar Anotação da Estadia</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -854,7 +1101,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                   Excluir definitivamente "{pet.nameAndBreed}"?
                 </h3>
                 <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
-                  Esta ação é <strong>permanente e irreversível</strong>. Todos os dados cadastrais, foto e histórico de estadias deste pet serão removidos do Firestore.
+                  Esta ação é <strong>permanente e irreversível</strong>. Todos os dados cadastrais, foto, estadias e observações confidenciais do admin serão removidos do Firestore.
                 </p>
               </div>
             </div>

@@ -47,6 +47,13 @@ export async function cascadeDeletePet(
     // 2. Delete pet document
     await deleteDoc(doc(db, 'pets', petId));
 
+    // 2.1 Delete isolated private admin internal notes for this pet
+    try {
+      await deleteDoc(doc(db, 'pet_admin_notes', petId));
+    } catch (noteErr) {
+      console.warn('Note deletion warning (may not exist):', noteErr);
+    }
+
     // 3. Check if tutor has other pets registered
     let tutorDeleted = false;
     if (tutorId) {

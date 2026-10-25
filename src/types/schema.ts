@@ -140,11 +140,33 @@ export interface Stay {
   /** Specific care notes, medication batches, or belongings brought for this stay */
   specialStayNotes: string;
 
+  /** Private admin operational notes about this stay (observations, incidents, boarding behavior) */
+  adminStayNotes?: string;
+
   /** Document creation timestamp */
   createdAt: FirestoreDateTime;
 
   /** Actual check-out timestamp if completed */
   actualCheckOutDate?: string;
+}
+
+/**
+ * Private Admin Collection: pet_admin_notes
+ * Stores confidential behavioral observations, quirks, handling tips, and owner communication notes
+ * strictly isolated from the public pets collection.
+ */
+export interface PetAdminNotes {
+  /** Document ID matching Pet.id */
+  id?: string;
+
+  /** Foreign Key referencing Pet.id */
+  petId: string;
+
+  /** Confidential internal observations about the dog */
+  internalNotes: string;
+
+  /** Document last update timestamp */
+  updatedAt?: FirestoreDateTime;
 }
 
 /**
