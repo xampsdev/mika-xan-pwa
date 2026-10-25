@@ -14,8 +14,28 @@ let cachedIcons: GeneratedIcons | null = null;
 let injectionStarted = false;
 
 /**
- * Loads /icon.svg, draws it onto HTML5 canvases at various PWA standard resolutions,
- * and produces valid PNG DataURLs.
+ * Creates a smooth 5-stop diagonal linear gradient across the Rose Quartz & Serenity palette.
+ */
+function createPaletteGradient(ctx: CanvasRenderingContext2D, size: number): CanvasGradient {
+  const grad = ctx.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, '#f7cac9');
+  grad.addColorStop(0.25, '#dec2cb');
+  grad.addColorStop(0.5, '#c5b9cd');
+  grad.addColorStop(0.75, '#abb1cf');
+  grad.addColorStop(1, '#92a8d1');
+  return grad;
+}
+
+/**
+ * Clears the in-memory icon cache to force re-render from SVG.
+ */
+export function clearIconCache(): void {
+  cachedIcons = null;
+}
+
+/**
+ * Loads /icon.svg, draws it onto HTML5 canvases with a solid 5-stop Rose Quartz & Serenity
+ * gradient base layer at various standard PWA resolutions, and produces valid PNG DataURLs.
  */
 export async function generatePwaIconsFromSvg(svgUrl = '/icon.svg'): Promise<GeneratedIcons> {
   if (cachedIcons) {
@@ -43,7 +63,7 @@ export async function generatePwaIconsFromSvg(svgUrl = '/icon.svg'): Promise<Gen
 
   const renderToCanvas = (
     size: number,
-    solidBgColor: string | null = null,
+    useGradientBg = true,
     scalePercent = 1.0
   ): string => {
     const canvas = document.createElement('canvas');
@@ -55,8 +75,10 @@ export async function generatePwaIconsFromSvg(svgUrl = '/icon.svg'): Promise<Gen
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    if (solidBgColor) {
-      ctx.fillStyle = solidBgColor;
+    // Solid 5-stop gradient base layer prevents black/transparent borders on iOS Safari and Android
+    if (useGradientBg) {
+      const grad = createPaletteGradient(ctx, size);
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, size, size);
     } else {
       ctx.clearRect(0, 0, size, size);
@@ -73,15 +95,15 @@ export async function generatePwaIconsFromSvg(svgUrl = '/icon.svg'): Promise<Gen
     return canvas.toDataURL('image/png');
   };
 
-  // Apple touch icon (180x180): iOS requires opaque background
-  const appleTouchIcon = renderToCanvas(180, '#D96B43', 1.0);
+  // Apple touch icon (180x180): iOS requires fully opaque background
+  const appleTouchIcon = renderToCanvas(180, true, 1.0);
 
-  // Standard PWA icons
-  const pwa192 = renderToCanvas(192, null, 1.0);
-  const pwa512 = renderToCanvas(512, null, 1.0);
+  // Standard PWA icons: render with solid 5-stop gradient base layer
+  const pwa192 = renderToCanvas(192, true, 1.0);
+  const pwa512 = renderToCanvas(512, true, 1.0);
 
-  // Maskable icon: Needs safe-zone margin (80% diameter centered)
-  const pwaMaskable512 = renderToCanvas(512, '#D96B43', 0.8);
+  // Maskable icon: Needs safe-zone margin (80% diameter centered) over solid 5-stop gradient
+  const pwaMaskable512 = renderToCanvas(512, true, 0.8);
 
   URL.revokeObjectURL(objectUrl);
 
@@ -136,8 +158,8 @@ export async function initPwaIconInjection(): Promise<void> {
         display: 'standalone',
         display_override: ['standalone', 'minimal-ui'],
         orientation: 'portrait',
-        background_color: '#FAF7F2',
-        theme_color: '#D96B43',
+        background_color: '#FAF8F9',
+        theme_color: '#92a8d1',
         categories: ['lifestyle', 'utilities', 'business'],
         icons: [
           {
@@ -197,6 +219,7 @@ export async function initPwaIconInjection(): Promise<void> {
  * Triggers client-side download of the 4 rendered PNG files directly from icon.svg
  */
 export async function downloadGeneratedIcons(): Promise<{ success: boolean; count: number }> {
+  clearIconCache();
   const icons = await generatePwaIconsFromSvg('/icon.svg');
 
   const files = [
