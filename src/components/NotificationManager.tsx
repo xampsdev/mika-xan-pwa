@@ -194,35 +194,35 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
   const isConfigured = permission === 'granted';
 
   return (
-    <div className="p-4 sm:p-5 rounded-3xl bg-white border border-[#E7E2D8] shadow-sm space-y-4">
+    <div className="p-4 sm:p-5 rounded-3xl bg-white border border-[#dec2cb]/60 shadow-sm space-y-4">
       {/* Primary Push Header & Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
             className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
               isConfigured
-                ? 'bg-[#E8F0EA] text-[#245235] border border-[#C5DDCB]'
-                : 'bg-[#FAF7F2] text-[#D96B43] border border-[#E7E2D8]'
+                ? 'bg-[#d2e3d8] text-[#133E26] border border-[#a3cbb1]'
+                : 'bg-gradient-to-br from-[#f7cac9] to-[#92a8d1] text-[#1E293B] border border-[#dec2cb]'
             }`}
           >
-            {isConfigured ? <BellRing className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
+            {isConfigured ? <BellRing className="w-5 h-5 text-[#133E26]" /> : <Bell className="w-5 h-5 text-[#1E293B]" />}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-[#1C1917] tracking-tight">
+              <h3 className="text-sm font-bold text-[#1E293B] tracking-tight">
                 Notificações Push no Celular
               </h3>
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                   isConfigured
-                    ? 'bg-[#E8F0EA] text-[#245235] border border-[#C5DDCB]'
-                    : 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]'
+                    ? 'bg-[#d2e3d8] text-[#133E26] border border-[#a3cbb1]'
+                    : 'bg-[#c5b9cd]/40 text-[#1E293B] border border-[#dec2cb]'
                 }`}
               >
                 {isConfigured ? 'Ativas' : 'Pendente'}
               </span>
             </div>
-            <p className="text-xs text-[#78716C] mt-0.5">
+            <p className="text-xs text-[#64748B] mt-0.5">
               Receba alertas sonoros no celular sempre que um tutor enviar uma nova ficha de check-in.
             </p>
           </div>
@@ -233,12 +233,12 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
             <button
               onClick={handleTestNotification}
               disabled={testingLocal}
-              className="w-full sm:w-auto min-h-[44px] px-4 rounded-xl bg-[#FAF7F2] hover:bg-[#F0ECE4] active:bg-[#E7E2D8] border border-[#E7E2D8] text-[#1C1917] text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto min-h-[44px] px-4 rounded-xl bg-[#FAF8F9] hover:bg-[#F3EFF2] border border-[#dec2cb] text-[#1E293B] text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
             >
               {testingLocal ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D96B43]" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2D3E5E]" />
               ) : (
-                <Volume2 className="w-3.5 h-3.5 text-[#D96B43]" />
+                <Volume2 className="w-3.5 h-3.5 text-[#2D3E5E]" />
               )}
               <span>Testar Notificação Agora</span>
             </button>
@@ -246,16 +246,16 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
             <button
               onClick={handleEnableNotifications}
               disabled={loading}
-              className="w-full sm:w-auto min-h-[44px] px-5 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] active:bg-[#AA4D29] disabled:opacity-50 text-white text-xs font-bold shadow-sm shadow-[#D96B43]/20 flex items-center justify-center gap-2 transition cursor-pointer"
+              className="w-full sm:w-auto min-h-[44px] px-5 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] active:scale-[0.99] disabled:opacity-50 text-[#1E293B] text-xs font-bold shadow-sm border border-[#7b93c2] flex items-center justify-center gap-2 transition cursor-pointer"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1E293B]" />
                   <span>Configurando...</span>
                 </>
               ) : (
                 <>
-                  <BellRing className="w-3.5 h-3.5" />
+                  <BellRing className="w-3.5 h-3.5 text-[#1E293B]" />
                   <span>Ativar Notificações</span>
                 </>
               )}
@@ -266,11 +266,11 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
 
       {/* iOS Standalone Requirement Instruction Banner */}
       {isIOS && !isStandalone && (
-        <div className="p-3.5 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-xs text-[#92400E] flex items-start gap-2.5">
-          <Smartphone className="w-4 h-4 shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-2xl bg-[#f7cac9]/50 border border-[#dec2cb] text-xs text-[#1E293B] flex items-start gap-2.5">
+          <Smartphone className="w-4 h-4 shrink-0 mt-0.5 text-[#2D3E5E]" />
           <div className="space-y-0.5">
-            <span className="font-bold block">Requisito do iOS Safari (Apple)</span>
-            <p className="text-[#92400E]/90 leading-relaxed text-[11px]">
+            <span className="font-bold block text-[#1E293B]">Requisito do iOS Safari (Apple)</span>
+            <p className="text-[#1E293B]/80 leading-relaxed text-[11px]">
               No iPhone e iPad, o Safari só libera Web Push se o app for adicionado à tela inicial.
               Toque em <strong>Compartilhar</strong> no Safari, selecione <strong>"Adicionar à Tela de Início"</strong> e abra por lá.
             </p>
@@ -280,34 +280,34 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
 
       {/* Success Notification */}
       {successMsg && (
-        <div className="p-3 rounded-2xl bg-[#E8F0EA] border border-[#C5DDCB] text-[#245235] text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+        <div className="p-3 rounded-2xl bg-[#d2e3d8] border border-[#a3cbb1] text-[#133E26] text-xs font-bold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-[#133E26]" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {/* Error Notification */}
       {errorMsg && (
-        <div className="p-3 rounded-2xl bg-[#FEE2E2] border border-[#FECACA] text-[#991B1B] text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
+        <div className="p-3 rounded-2xl bg-[#f7cac9] border border-[#dec2cb] text-[#7F1D1D] text-xs font-bold flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-[#7F1D1D]" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* 24/7 Background Push Bridge via ntfy.sh */}
-      <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8] space-y-2.5">
+      <div className="p-3.5 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Radio className="w-4 h-4 text-[#D96B43]" />
-            <span className="text-xs font-bold text-[#1C1917]">
+            <Radio className="w-4 h-4 text-[#2D3E5E]" />
+            <span className="text-xs font-bold text-[#1E293B]">
               Ponte 24/7 Anti-Suspensão (ntfy.sh)
             </span>
           </div>
-          <span className="text-[10px] font-mono text-[#78716C] bg-white px-2 py-0.5 rounded border border-[#E7E2D8]">
+          <span className="text-[10px] font-mono text-[#1E293B] bg-white px-2 py-0.5 rounded border border-[#dec2cb]">
             {NTFY_TOPIC}
           </span>
         </div>
-        <p className="text-[11px] text-[#78716C] leading-relaxed">
+        <p className="text-[11px] text-[#64748B] leading-relaxed">
           Garante recebimento com toque e vibração mesmo se o Chrome estiver suspenso ou a tela bloqueada.
           Instale o app gratuito <strong>ntfy</strong> (Play Store / App Store) e inscreva-se no tópico acima.
         </p>
@@ -317,28 +317,28 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
             href={NTFY_WEB_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#F0ECE4] text-[#1C1917] border border-[#E7E2D8] rounded-xl text-xs font-semibold transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#F3EFF2] text-[#1E293B] border border-[#dec2cb] rounded-xl text-xs font-bold transition shadow-xs"
           >
             <span>Abrir Tópico Web</span>
-            <ExternalLink className="w-3 h-3 text-[#78716C]" />
+            <ExternalLink className="w-3 h-3 text-[#64748B]" />
           </a>
 
           <button
             type="button"
             onClick={handleTestNtfyBridge}
             disabled={testingNtfy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#F0ECE4] text-[#D96B43] border border-[#E7E2D8] rounded-xl text-xs font-semibold transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#F3EFF2] text-[#1E293B] border border-[#dec2cb] rounded-xl text-xs font-bold transition cursor-pointer shadow-xs"
           >
             {testingNtfy ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
+              <Loader2 className="w-3 h-3 animate-spin text-[#2D3E5E]" />
             ) : (
-              <Send className="w-3 h-3" />
+              <Send className="w-3 h-3 text-[#2D3E5E]" />
             )}
             <span>Testar Push (ntfy)</span>
           </button>
 
           {ntfyFeedback && (
-            <span className="text-[11px] font-medium text-[#245235]">
+            <span className="text-[11px] font-bold text-[#133E26]">
               {ntfyFeedback}
             </span>
           )}
@@ -347,11 +347,11 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
 
       {/* Token Details Info */}
       {fcmToken && (
-        <div className="pt-2 border-t border-[#E7E2D8] flex items-center justify-between text-[11px] text-[#78716C]">
+        <div className="pt-2 border-t border-[#dec2cb]/60 flex items-center justify-between text-[11px] text-[#64748B]">
           <span className="font-mono truncate max-w-xs">
             Token: {fcmToken.slice(0, 16)}...{fcmToken.slice(-6)}
           </span>
-          <span className="text-[#245235] font-semibold flex items-center gap-1">
+          <span className="text-[#133E26] font-bold flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
             Salvo em admin_tokens
           </span>

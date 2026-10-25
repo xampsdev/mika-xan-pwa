@@ -18,6 +18,7 @@ import {
   setDoc as fbSetDoc,
   addDoc as fbAddDoc,
   updateDoc as fbUpdateDoc,
+  deleteDoc as fbDeleteDoc,
   onSnapshot as fbOnSnapshot,
   serverTimestamp as fbServerTimestamp,
 } from 'firebase/firestore';
@@ -28,6 +29,9 @@ import {
   signOut as fbSignOut,
   onAuthStateChanged as fbOnAuthStateChanged,
   sendPasswordResetEmail as fbSendPasswordResetEmail,
+  setPersistence,
+  inMemoryPersistence,
+  browserSessionPersistence,
 } from 'firebase/auth';
 import {
   getStorage,
@@ -71,6 +75,14 @@ try {
 }
 
 const auth: Auth = getAuth(app);
+
+// Force in-memory persistence so admin session never persists across tab closes or reloads
+if (typeof window !== 'undefined') {
+  setPersistence(auth, inMemoryPersistence).catch((err) => {
+    console.warn('Auth in-memory persistence notice:', err);
+  });
+}
+
 const storage: FirebaseStorage = getStorage(app);
 
 let messaging: Messaging | null = null;
@@ -233,6 +245,16 @@ export async function updateDoc(docRef: any, data: any): Promise<void> {
     return;
   }
   return fbUpdateDoc(docRef, data);
+}
+
+export async function deleteDoc(docRef: any): Promise<void> {
+  if (isMockMode) {
+    const colName = docRef.collectionName;
+    const docId = docRef.id;
+    mockStore.deleteDocument(colName, docId);
+    return;
+  }
+  return fbDeleteDoc(docRef);
 }
 
 export function onSnapshot(
@@ -400,4 +422,13 @@ export function onAuthStateChanged(
   return fbOnAuthStateChanged(authInstance, callback);
 }
 
-export { app, auth, db, storage, messaging };
+export {
+  app,
+  auth,
+  db,
+  storage,
+  messaging,
+  setPersistence,
+  inMemoryPersistence,
+  browserSessionPersistence,
+};

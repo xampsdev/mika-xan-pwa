@@ -104,6 +104,12 @@ export class LocalMockStore {
     return updatedDoc;
   }
 
+  public deleteDocument(collectionName: string, id: string): void {
+    const items = this.getCollection<any>(collectionName);
+    const updated = items.filter((item) => item.id !== id);
+    this.saveCollection(collectionName, updated);
+  }
+
   public subscribe(
     collectionName: string,
     callback: (items: any[]) => void

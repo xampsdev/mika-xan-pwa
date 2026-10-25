@@ -19,7 +19,6 @@ import {
   Search,
   User,
   Phone,
-  Calendar,
   Camera,
   CheckCircle2,
   AlertCircle,
@@ -27,16 +26,11 @@ import {
   ArrowRight,
   ArrowLeft,
   Dog,
-  Sparkles,
-  ShieldCheck,
-  HeartHandshake,
   Utensils,
-  Moon,
-  Clock,
   Loader2,
   RotateCcw,
 } from 'lucide-react';
-import { formatBrazilianPhone, sanitizePhone, isValidBrazilianPhone } from '@/utils/phone';
+import { formatBrazilianPhone, isValidBrazilianPhone } from '@/utils/phone';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
 import { sendNtfyAlert } from '@/lib/ntfy';
 import type { Tutor, Pet, Stay, StayStatus } from '@/types/schema';
@@ -414,45 +408,45 @@ export const ClientCheckIn: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-4 py-4 sm:py-6 overflow-x-hidden">
+    <div className="max-w-lg mx-auto min-h-[100dvh] flex flex-col justify-between bg-[#FAF8F9] overflow-x-hidden px-4 py-4 sm:py-6">
       {/* ─────────────────────────────────────────────────────────────
           STAGE 1: Phone Lookup (Field 2)
       ───────────────────────────────────────────────────────────── */}
       {stage === 'phone_lookup' && (
-        <div className="bg-white border border-[#E7E2D8] rounded-3xl p-5 sm:p-7 shadow-sm space-y-5">
-          <div className="flex items-center gap-2 text-[#D96B43] font-bold text-xs uppercase tracking-wider">
-            <Search className="w-4 h-4" />
+        <div className="bg-white border border-[#dec2cb]/60 rounded-3xl p-5 sm:p-7 shadow-sm space-y-5 my-auto">
+          <div className="flex items-center gap-2 text-[#1E293B] font-bold text-xs uppercase tracking-wider">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#92a8d1]" />
             <span>Check-in Rápido de Hospedagem</span>
           </div>
 
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-[#1C1917] tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-black text-[#1E293B] tracking-tight">
               Informe seu WhatsApp ou Telefone
             </h2>
-            <p className="text-xs sm:text-sm text-[#78716C] mt-1 leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#64748B] mt-1 leading-relaxed">
               Se você já tem cadastro na Mika &amp; Xan, buscamos o perfil do seu pet para você só revisar e confirmar a estadia!
             </p>
           </div>
 
           <form onSubmit={(e) => { e.preventDefault(); handlePhoneLookup(); }} className="space-y-4 pt-1">
             <div>
-              <label className="block text-xs font-bold text-[#1C1917] uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-bold text-[#1E293B] uppercase tracking-wider mb-1.5">
                 Telefone com DDD (Campo 2)
               </label>
               <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#78716C]" />
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
                 <input
                   type="tel"
                   inputMode="numeric"
                   placeholder="(11) 98765-4321"
                   value={lookupPhone}
                   onChange={(e) => setLookupPhone(formatBrazilianPhone(e.target.value))}
-                  className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl pl-10 pr-4 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition font-mono"
+                  className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl pl-10 pr-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition font-mono"
                   autoFocus
                 />
               </div>
               {lookupError && (
-                <p className="mt-2 text-xs text-[#991B1B] flex items-center gap-1.5 font-medium">
+                <p className="mt-2 text-xs text-[#7F1D1D] bg-[#f7cac9]/60 border border-[#dec2cb] p-2.5 rounded-xl flex items-center gap-1.5 font-bold">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{lookupError}</span>
                 </p>
@@ -463,17 +457,17 @@ export const ClientCheckIn: React.FC = () => {
               type="button"
               onClick={() => handlePhoneLookup()}
               disabled={lookupLoading || !lookupPhone}
-              className="w-full min-h-[48px] px-5 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] active:bg-[#AA4D29] disabled:opacity-50 text-white font-bold text-sm shadow-sm shadow-[#D96B43]/20 flex items-center justify-center gap-2 transition cursor-pointer"
+              className="w-full min-h-[48px] px-5 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] active:scale-[0.99] disabled:opacity-50 text-[#1E293B] font-bold text-sm shadow-sm border border-[#7b93c2] flex items-center justify-center gap-2 transition cursor-pointer"
             >
               {lookupLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin text-[#1E293B]" />
                   <span>Buscando cadastro...</span>
                 </>
               ) : (
                 <>
                   <span>Prosseguir para Check-in</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 text-[#1E293B]" />
                 </>
               )}
             </button>
@@ -485,17 +479,17 @@ export const ClientCheckIn: React.FC = () => {
           STAGE 2: Returning Client Flow (List Existing Pets)
       ───────────────────────────────────────────────────────────── */}
       {stage === 'returning_client' && existingTutor && (
-        <div className="bg-white border border-[#E7E2D8] rounded-3xl p-5 sm:p-7 shadow-sm space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#E7E2D8] pb-4 gap-2">
+        <div className="bg-white border border-[#dec2cb]/60 rounded-3xl p-5 sm:p-7 shadow-sm space-y-5 my-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#dec2cb]/60 pb-4 gap-2">
             <div>
-              <span className="text-[10px] font-bold text-[#245235] bg-[#E8F0EA] px-2 py-0.5 rounded border border-[#C5DDCB] uppercase">
+              <span className="text-[10px] font-bold text-[#133E26] bg-[#d2e3d8] px-2 py-0.5 rounded border border-[#a3cbb1] uppercase">
                 Cliente Cadastrado
               </span>
-              <h2 className="text-xl sm:text-2xl font-black text-[#1C1917] mt-1">
+              <h2 className="text-xl sm:text-2xl font-black text-[#1E293B] mt-1">
                 Olá, {existingTutor.fullName}!
               </h2>
-              <p className="text-xs text-[#78716C] mt-0.5">
-                WhatsApp: <strong className="text-[#1C1917] font-mono">{existingTutor.phoneDDD}</strong>
+              <p className="text-xs text-[#64748B] mt-0.5">
+                WhatsApp: <strong className="text-[#1E293B] font-mono">{existingTutor.phoneDDD}</strong>
               </p>
             </div>
 
@@ -505,22 +499,22 @@ export const ClientCheckIn: React.FC = () => {
                 setExistingTutor(null);
                 setExistingPets([]);
               }}
-              className="text-xs font-semibold text-[#D96B43] hover:underline self-start sm:self-auto min-h-[36px] flex items-center"
+              className="text-xs font-bold text-[#1E293B] underline underline-offset-2 hover:opacity-80 self-start sm:self-auto min-h-[36px] flex items-center"
             >
               Trocar Telefone
             </button>
           </div>
 
           <div>
-            <h3 className="text-sm font-bold text-[#1C1917] mb-1">
+            <h3 className="text-sm font-bold text-[#1E293B] mb-1">
               Selecione o pet para a nova hospedagem:
             </h3>
-            <p className="text-xs text-[#78716C] mb-4">
+            <p className="text-xs text-[#64748B] mb-4">
               Os 22 campos do perfil selecionado serão preenchidos automaticamente.
             </p>
 
             {existingPets.length === 0 ? (
-              <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8] text-xs text-[#78716C] text-center">
+              <div className="p-4 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60 text-xs text-[#64748B] text-center">
                 Nenhum pet encontrado para este tutor.
               </div>
             ) : (
@@ -528,31 +522,31 @@ export const ClientCheckIn: React.FC = () => {
                 {existingPets.map((pet) => (
                   <div
                     key={pet.id}
-                    className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8] hover:border-[#D96B43] transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-4 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60 hover:border-[#92a8d1] transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3">
                       {pet.photoUrl ? (
                         <img
                           src={pet.photoUrl}
                           alt={pet.nameAndBreed}
-                          className="w-14 h-14 rounded-2xl object-cover border border-[#E7E2D8] shrink-0"
+                          className="w-14 h-14 rounded-2xl object-cover border border-[#dec2cb] shrink-0"
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-[#E8F0EA] text-[#245235] flex items-center justify-center shrink-0">
+                        <div className="w-14 h-14 rounded-2xl bg-[#c5b9cd]/30 text-[#1E293B] border border-[#dec2cb] flex items-center justify-center shrink-0">
                           <Dog className="w-7 h-7" />
                         </div>
                       )}
                       <div>
-                        <h4 className="text-sm font-bold text-[#1C1917]">{pet.nameAndBreed}</h4>
-                        <p className="text-xs text-[#78716C]">{pet.ageAndWeight}</p>
+                        <h4 className="text-sm font-bold text-[#1E293B]">{pet.nameAndBreed}</h4>
+                        <p className="text-xs text-[#64748B]">{pet.ageAndWeight}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {pet.isNeutered && (
-                            <span className="text-[10px] bg-[#E8F0EA] text-[#245235] px-1.5 py-0.5 rounded border border-[#C5DDCB]">
+                            <span className="text-[10px] bg-[#d2e3d8] text-[#133E26] px-1.5 py-0.5 rounded border border-[#a3cbb1] font-bold">
                               Castrado
                             </span>
                           )}
                           {pet.vaccinationUpToDate && (
-                            <span className="text-[10px] bg-[#FEF3C7] text-[#92400E] px-1.5 py-0.5 rounded border border-[#FDE68A]">
+                            <span className="text-[10px] bg-[#92a8d1]/30 text-[#1E293B] px-1.5 py-0.5 rounded border border-[#7b93c2]/40 font-bold">
                               Vacinas OK
                             </span>
                           )}
@@ -562,7 +556,7 @@ export const ClientCheckIn: React.FC = () => {
 
                     <button
                       onClick={() => handleSelectExistingPet(pet)}
-                      className="min-h-[44px] px-4 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm"
+                      className="min-h-[44px] px-4 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] text-[#1E293B] text-xs font-bold border border-[#7b93c2] flex items-center justify-center gap-1.5 transition shadow-sm"
                     >
                       <span>Check-in com este Pet</span>
                       <ArrowRight className="w-3.5 h-3.5" />
@@ -573,12 +567,12 @@ export const ClientCheckIn: React.FC = () => {
             )}
           </div>
 
-          <div className="pt-2 border-t border-[#E7E2D8]">
+          <div className="pt-2 border-t border-[#dec2cb]/60">
             <button
               onClick={handleRegisterNewPetForTutor}
-              className="w-full min-h-[48px] py-3 rounded-xl border border-dashed border-[#D96B43] hover:bg-[#FAF7F2] text-[#D96B43] text-xs font-bold flex items-center justify-center gap-2 transition"
+              className="w-full min-h-[48px] py-3 rounded-xl border border-dashed border-[#92a8d1] bg-white hover:bg-[#FAF8F9] text-[#1E293B] text-xs font-bold flex items-center justify-center gap-2 transition"
             >
-              <PlusCircle className="w-4 h-4" />
+              <PlusCircle className="w-4 h-4 text-[#2D3E5E]" />
               <span>Cadastrar Outro Pet para {existingTutor.fullName}</span>
             </button>
           </div>
@@ -589,18 +583,18 @@ export const ClientCheckIn: React.FC = () => {
           STAGE 3: Multi-Step Intake Form (22 Fields Normalized)
       ───────────────────────────────────────────────────────────── */}
       {stage === 'intake_form' && (
-        <div className="bg-white border border-[#E7E2D8] rounded-3xl shadow-sm overflow-hidden pb-24 sm:pb-28">
-          {/* Progress Header */}
-          <div className="border-b border-[#E7E2D8] p-4 sm:p-5 bg-[#FAF7F2]">
+        <div className="bg-white border border-[#dec2cb]/60 rounded-3xl shadow-sm overflow-hidden pb-24 sm:pb-28">
+          {/* Progress Header with Rose Quartz & Serenity theme */}
+          <div className="border-b border-[#dec2cb]/60 p-4 sm:p-5 bg-gradient-to-r from-[#f7cac9]/30 via-[#c5b9cd]/30 to-[#92a8d1]/30">
             <div className="flex items-center justify-between text-xs mb-2.5">
-              <span className="font-bold text-[#D96B43]">
+              <span className="font-bold text-[#1E293B]">
                 {selectedPetId
                   ? 'Revisão & Check-in'
                   : existingTutor
                     ? 'Novo Pet para Tutor'
                     : 'Ficha Cadastral (22 Campos)'}
               </span>
-              <span className="text-[#78716C] font-semibold text-[11px]">
+              <span className="text-[#64748B] font-bold text-[11px]">
                 {subStep === 'tutor_vet' && '1/4: Tutor & Vet'}
                 {subStep === 'pet_health' && '2/4: Pet & Saúde'}
                 {subStep === 'behavior_routine' && '3/4: Rotina & Manejo'}
@@ -608,14 +602,14 @@ export const ClientCheckIn: React.FC = () => {
               </span>
             </div>
 
-            {/* Stepper Tabs */}
+            {/* Stepper Dots */}
             <div className="grid grid-cols-4 gap-1.5">
               <button
                 type="button"
                 disabled={stepTransitionLock}
                 onClick={() => changeSubStep('tutor_vet')}
                 className={`h-2 rounded-full transition disabled:opacity-50 ${
-                  subStep === 'tutor_vet' ? 'bg-[#D96B43]' : 'bg-[#E7E2D8]'
+                  subStep === 'tutor_vet' ? 'bg-[#92a8d1] shadow-xs' : 'bg-[#dec2cb]/70'
                 }`}
                 title="Tutor & Veterinário"
               />
@@ -624,7 +618,7 @@ export const ClientCheckIn: React.FC = () => {
                 disabled={stepTransitionLock}
                 onClick={() => changeSubStep('pet_health')}
                 className={`h-2 rounded-full transition disabled:opacity-50 ${
-                  subStep === 'pet_health' ? 'bg-[#D96B43]' : 'bg-[#E7E2D8]'
+                  subStep === 'pet_health' ? 'bg-[#92a8d1] shadow-xs' : 'bg-[#dec2cb]/70'
                 }`}
                 title="Pet & Saúde"
               />
@@ -633,7 +627,7 @@ export const ClientCheckIn: React.FC = () => {
                 disabled={stepTransitionLock}
                 onClick={() => changeSubStep('behavior_routine')}
                 className={`h-2 rounded-full transition disabled:opacity-50 ${
-                  subStep === 'behavior_routine' ? 'bg-[#D96B43]' : 'bg-[#E7E2D8]'
+                  subStep === 'behavior_routine' ? 'bg-[#92a8d1] shadow-xs' : 'bg-[#dec2cb]/70'
                 }`}
                 title="Comportamento & Rotina"
               />
@@ -642,7 +636,7 @@ export const ClientCheckIn: React.FC = () => {
                 disabled={stepTransitionLock}
                 onClick={() => changeSubStep('photo_stay')}
                 className={`h-2 rounded-full transition disabled:opacity-50 ${
-                  subStep === 'photo_stay' ? 'bg-[#D96B43]' : 'bg-[#E7E2D8]'
+                  subStep === 'photo_stay' ? 'bg-[#92a8d1] shadow-xs' : 'bg-[#dec2cb]/70'
                 }`}
                 title="Foto & Hospedagem"
               />
@@ -655,14 +649,14 @@ export const ClientCheckIn: React.FC = () => {
             ───────────────────────────────────────────────────────── */}
             {subStep === 'tutor_vet' && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-[#D96B43] font-bold text-xs uppercase tracking-wider">
-                  <User className="w-4 h-4" />
+                <div className="flex items-center gap-2 text-[#1E293B] font-bold text-xs uppercase tracking-wider">
+                  <User className="w-4 h-4 text-[#2D3E5E]" />
                   <span>Etapa A: Informações do Tutor &amp; Emergência</span>
                 </div>
 
                 {/* Field 1 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     1. Nome Completo do Tutor *
                   </label>
                   <input
@@ -671,13 +665,13 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Maria Clara dos Santos"
                     value={formData.fullName}
                     onChange={(e) => updateField('fullName', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 2 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     2. Telefone / WhatsApp com DDD *
                   </label>
                   <input
@@ -687,13 +681,13 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="(11) 98765-4321"
                     value={formData.phoneDDD}
                     onChange={(e) => updateField('phoneDDD', formatBrazilianPhone(e.target.value))}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition font-mono"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition font-mono"
                   />
                 </div>
 
                 {/* Field 3 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     3. Veterinário Responsável ou Clínica de Emergência
                   </label>
                   <input
@@ -701,9 +695,9 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Dr. Roberto / Clínica VetCare (11) 99999-0000"
                     value={formData.vetNameAndPhone}
                     onChange={(e) => updateField('vetNameAndPhone', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
-                  <span className="text-[11px] text-[#78716C] mt-1 block">
+                  <span className="text-[11px] text-[#64748B] mt-1 block">
                     Contato do médico veterinário para urgências durante o período de estadia.
                   </span>
                 </div>
@@ -715,14 +709,14 @@ export const ClientCheckIn: React.FC = () => {
             ───────────────────────────────────────────────────────── */}
             {subStep === 'pet_health' && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-[#D96B43] font-bold text-xs uppercase tracking-wider">
-                  <Dog className="w-4 h-4" />
+                <div className="flex items-center gap-2 text-[#1E293B] font-bold text-xs uppercase tracking-wider">
+                  <Dog className="w-4 h-4 text-[#2D3E5E]" />
                   <span>Etapa B: Identificação e Saúde do Pet</span>
                 </div>
 
                 {/* Field 4 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     4. Nome do Pet e Raça *
                   </label>
                   <input
@@ -731,13 +725,13 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Thor - Golden Retriever"
                     value={formData.nameAndBreed}
                     onChange={(e) => updateField('nameAndBreed', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 5 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     5. Idade e Peso Aproximado *
                   </label>
                   <input
@@ -746,14 +740,14 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: 3 anos e meio - 28 kg"
                     value={formData.ageAndWeight}
                     onChange={(e) => updateField('ageAndWeight', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 6 & 12 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8]">
-                    <span className="block text-xs font-bold text-[#1C1917] mb-2">
+                  <div className="p-3.5 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60">
+                    <span className="block text-xs font-bold text-[#1E293B] mb-2">
                       6. O pet é castrado(a)?
                     </span>
                     <div className="grid grid-cols-2 gap-2">
@@ -762,8 +756,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('isNeutered', true)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           formData.isNeutered
-                            ? 'bg-[#D96B43] text-white border-[#D96B43]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#92a8d1] text-[#1E293B] border-[#7b93c2]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Sim (Castrado)
@@ -773,8 +767,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('isNeutered', false)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           !formData.isNeutered
-                            ? 'bg-[#D96B43] text-white border-[#D96B43]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#c5b9cd] text-[#1E293B] border-[#b09ebc]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Não castrado
@@ -782,8 +776,8 @@ export const ClientCheckIn: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8]">
-                    <span className="block text-xs font-bold text-[#1C1917] mb-2">
+                  <div className="p-3.5 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60">
+                    <span className="block text-xs font-bold text-[#1E293B] mb-2">
                       12. Vacinas (V8/V10, Raiva, Gripe) em dia?
                     </span>
                     <div className="grid grid-cols-2 gap-2">
@@ -792,8 +786,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('vaccinationUpToDate', true)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           formData.vaccinationUpToDate
-                            ? 'bg-[#245235] text-white border-[#245235]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#d2e3d8] text-[#133E26] border-[#a3cbb1]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Em dia
@@ -803,8 +797,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('vaccinationUpToDate', false)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           !formData.vaccinationUpToDate
-                            ? 'bg-[#991B1B] text-white border-[#991B1B]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#f7cac9] text-[#7F1D1D] border-[#dec2cb]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Pendente
@@ -815,21 +809,21 @@ export const ClientCheckIn: React.FC = () => {
 
                 {/* Field 8 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     8. Possui alergias conhecidas e qual o protocolo?
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: Alergia a frango e picada de pulga; tomar Apoquel 5,4mg se coceira"
+                    placeholder="Ex: Alergia a frango e picada de pulga; tomar medicação se coceira"
                     value={formData.allergiesAndProtocol}
                     onChange={(e) => updateField('allergiesAndProtocol', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 9 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     9. Faz uso de medicação contínua? (Nome, dosagem e horários)
                   </label>
                   <textarea
@@ -837,13 +831,13 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Omeprazol 10mg às 07h em jejum; Condroplex às 19h com a refeição"
                     value={formData.continuousTreatmentDetails}
                     onChange={(e) => updateField('continuousTreatmentDetails', e.target.value)}
-                    className="w-full min-h-[56px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[56px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 10 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     10. Restrições físicas ou de exercícios
                   </label>
                   <input
@@ -851,13 +845,13 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Displasia coxofemoral leve, evitar pisos lisos e escadas longas"
                     value={formData.dietaryOrPhysicalRestrictions}
                     onChange={(e) => updateField('dietaryOrPhysicalRestrictions', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 11 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     11. Histórico de cirurgias ou doenças graves pregressas
                   </label>
                   <input
@@ -865,7 +859,7 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Castração em 2023, sem outras intervenções"
                     value={formData.pastSevereIllnessOrChronic}
                     onChange={(e) => updateField('pastSevereIllnessOrChronic', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
               </div>
@@ -876,14 +870,14 @@ export const ClientCheckIn: React.FC = () => {
             ───────────────────────────────────────────────────────── */}
             {subStep === 'behavior_routine' && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-[#D96B43] font-bold text-xs uppercase tracking-wider">
-                  <Utensils className="w-4 h-4" />
+                <div className="flex items-center gap-2 text-[#1E293B] font-bold text-xs uppercase tracking-wider">
+                  <Utensils className="w-4 h-4 text-[#2D3E5E]" />
                   <span>Etapa C: Comportamento, Rotina e Alimentação</span>
                 </div>
 
                 {/* Field 7 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     7. Comportamento com pessoas e outros animais
                   </label>
                   <textarea
@@ -891,14 +885,14 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Muito dócil com pessoas. Com outros cães machos é mais reservado."
                     value={formData.behaviorPeopleAndAnimals}
                     onChange={(e) => updateField('behaviorPeopleAndAnimals', e.target.value)}
-                    className="w-full min-h-[56px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[56px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 13 & 14 Toggles */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8]">
-                    <span className="block text-xs font-bold text-[#1C1917] mb-2">
+                  <div className="p-3.5 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60">
+                    <span className="block text-xs font-bold text-[#1E293B] mb-2">
                       13. Fica calmo quando fica sozinho?
                     </span>
                     <div className="grid grid-cols-2 gap-2">
@@ -907,8 +901,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('calmWhenAlone', true)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           formData.calmWhenAlone
-                            ? 'bg-[#245235] text-white border-[#245235]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#92a8d1] text-[#1E293B] border-[#7b93c2]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Sim, tranquilo
@@ -918,8 +912,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('calmWhenAlone', false)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           !formData.calmWhenAlone
-                            ? 'bg-[#92400E] text-white border-[#92400E]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#c5b9cd] text-[#1E293B] border-[#b09ebc]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Fica ansioso
@@ -927,8 +921,8 @@ export const ClientCheckIn: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8]">
-                    <span className="block text-xs font-bold text-[#1C1917] mb-2">
+                  <div className="p-3.5 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60">
+                    <span className="block text-xs font-bold text-[#1E293B] mb-2">
                       14. Destrói ou engole objetos não alimentares?
                     </span>
                     <div className="grid grid-cols-2 gap-2">
@@ -937,8 +931,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('destroysOrIngestsObjects', true)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           formData.destroysOrIngestsObjects
-                            ? 'bg-[#991B1B] text-white border-[#991B1B]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#f7cac9] text-[#7F1D1D] border-[#dec2cb]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Sim (Risco)
@@ -948,8 +942,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('destroysOrIngestsObjects', false)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           !formData.destroysOrIngestsObjects
-                            ? 'bg-[#245235] text-white border-[#245235]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#92a8d1] text-[#1E293B] border-[#7b93c2]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Não rói
@@ -960,7 +954,7 @@ export const ClientCheckIn: React.FC = () => {
 
                 {/* Field 15 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     15. Ração: Quantidade diária e horários das refeições *
                   </label>
                   <input
@@ -969,13 +963,13 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: 250g de Premier às 08h e 250g às 18h"
                     value={formData.foodAmountAndSchedule}
                     onChange={(e) => updateField('foodAmountAndSchedule', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 16 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     16. Petiscos, frutas e alimentação natural permitidos
                   </label>
                   <input
@@ -983,13 +977,13 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Pode maçã sem semente, cenoura e biscoito de carne"
                     value={formData.treatsAndNaturalDiet}
                     onChange={(e) => updateField('treatsAndNaturalDiet', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 17 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     17. Frequência e duração habitual dos passeios
                   </label>
                   <input
@@ -997,14 +991,14 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: 2 vezes ao dia (30 minutos pela manhã e à noite)"
                     value={formData.walkFrequencyAndDuration}
                     onChange={(e) => updateField('walkFrequencyAndDuration', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 18 & 19 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                    <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                       18. Onde e como dorme habitualmente?
                     </label>
                     <input
@@ -1012,12 +1006,12 @@ export const ClientCheckIn: React.FC = () => {
                       placeholder="Ex: Na caminha no quarto, com ar condicionado ligado"
                       value={formData.sleepBedAndLocation}
                       onChange={(e) => updateField('sleepBedAndLocation', e.target.value)}
-                      className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                      className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                     />
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8]">
-                    <span className="block text-xs font-bold text-[#1C1917] mb-2">
+                  <div className="p-3.5 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60">
+                    <span className="block text-xs font-bold text-[#1E293B] mb-2">
                       19. Faz necessidades no local correto?
                     </span>
                     <div className="grid grid-cols-2 gap-2">
@@ -1026,8 +1020,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('pottyTrained', true)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           formData.pottyTrained
-                            ? 'bg-[#245235] text-white border-[#245235]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#92a8d1] text-[#1E293B] border-[#7b93c2]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Sim (Tapete/Rua)
@@ -1037,8 +1031,8 @@ export const ClientCheckIn: React.FC = () => {
                         onClick={() => updateField('pottyTrained', false)}
                         className={`min-h-[44px] rounded-xl font-bold text-xs transition border flex items-center justify-center ${
                           !formData.pottyTrained
-                            ? 'bg-[#92400E] text-white border-[#92400E]'
-                            : 'bg-white text-[#78716C] border-[#E7E2D8]'
+                            ? 'bg-[#c5b9cd] text-[#1E293B] border-[#b09ebc]'
+                            : 'bg-white text-[#64748B] border-[#c5b9cd]'
                         }`}
                       >
                         Às vezes erra
@@ -1049,7 +1043,7 @@ export const ClientCheckIn: React.FC = () => {
 
                 {/* Field 20 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     20. Protocolo de banho e higiene
                   </label>
                   <input
@@ -1057,13 +1051,13 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Banho quinzenal com xampu neutro hipoalergênico"
                     value={formData.bathProtocol}
                     onChange={(e) => updateField('bathProtocol', e.target.value)}
-                    className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
 
                 {/* Field 21 */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     21. Observações gerais, medos e manias
                   </label>
                   <textarea
@@ -1071,7 +1065,7 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Morre de medo de fogos e trovões; adora carinho na barriga antes de dormir."
                     value={formData.generalNotes}
                     onChange={(e) => updateField('generalNotes', e.target.value)}
-                    className="w-full min-h-[56px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[56px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
               </div>
@@ -1082,17 +1076,17 @@ export const ClientCheckIn: React.FC = () => {
             ───────────────────────────────────────────────────────── */}
             {subStep === 'photo_stay' && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-[#D96B43] font-bold text-xs uppercase tracking-wider">
-                  <Camera className="w-4 h-4" />
+                <div className="flex items-center gap-2 text-[#1E293B] font-bold text-xs uppercase tracking-wider">
+                  <Camera className="w-4 h-4 text-[#2D3E5E]" />
                   <span>Etapa D: Foto do Pet e Datas da Hospedagem</span>
                 </div>
 
                 {/* Field 22: Photo Upload with Compression */}
-                <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8]">
-                  <span className="block text-xs font-bold text-[#1C1917] mb-1">
+                <div className="p-4 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60">
+                  <span className="block text-xs font-bold text-[#1E293B] mb-1">
                     22. Foto do Pet (Opcional)
                   </span>
-                  <p className="text-xs text-[#78716C] mb-3">
+                  <p className="text-xs text-[#64748B] mb-3">
                     A imagem é otimizada automaticamente no seu aparelho para identificação visual rápida no painel.
                   </p>
 
@@ -1101,18 +1095,18 @@ export const ClientCheckIn: React.FC = () => {
                       <img
                         src={compressedPreview}
                         alt="Preview"
-                        className="w-20 h-20 rounded-2xl object-cover border-2 border-[#D96B43] shadow-sm shrink-0"
+                        className="w-20 h-20 rounded-2xl object-cover border-2 border-[#92a8d1] shadow-sm shrink-0"
                       />
                     ) : (
-                      <div className="w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-[#E7E2D8] flex flex-col items-center justify-center text-[#78716C] shrink-0">
-                        <Camera className="w-6 h-6 mb-1 text-[#D96B43]" />
+                      <div className="w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-[#dec2cb] flex flex-col items-center justify-center text-[#64748B] shrink-0">
+                        <Camera className="w-6 h-6 mb-1 text-[#2D3E5E]" />
                         <span className="text-[10px]">Sem foto</span>
                       </div>
                     )}
 
                     <div className="flex-1 w-full">
-                      <label className="min-h-[48px] w-full px-4 rounded-xl bg-white border border-[#E7E2D8] hover:border-[#D96B43] text-[#1C1917] text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-sm transition">
-                        <Camera className="w-4 h-4 text-[#D96B43]" />
+                      <label className="min-h-[48px] w-full px-4 rounded-xl bg-white border border-[#dec2cb] hover:border-[#92a8d1] text-[#1E293B] text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-sm transition">
+                        <Camera className="w-4 h-4 text-[#2D3E5E]" />
                         <span>{compressedPreview ? 'Trocar Foto' : 'Tirar Foto ou Escolher da Galeria'}</span>
                         <input
                           type="file"
@@ -1129,7 +1123,7 @@ export const ClientCheckIn: React.FC = () => {
                 <div className="space-y-3 pt-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                      <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                         Data de Check-in *
                       </label>
                       <input
@@ -1137,12 +1131,12 @@ export const ClientCheckIn: React.FC = () => {
                         required
                         value={formData.checkInDate}
                         onChange={(e) => updateField('checkInDate', e.target.value)}
-                        className="w-full min-h-[52px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
+                        className="w-full min-h-[52px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] font-mono focus:outline-none transition"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                      <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                         Horário de Check-in *
                       </label>
                       <input
@@ -1150,14 +1144,14 @@ export const ClientCheckIn: React.FC = () => {
                         required
                         value={formData.checkInTime}
                         onChange={(e) => updateField('checkInTime', e.target.value)}
-                        className="w-full min-h-[52px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
+                        className="w-full min-h-[52px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] font-mono focus:outline-none transition"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                      <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                         Data de Check-out Previsto *
                       </label>
                       <input
@@ -1165,12 +1159,12 @@ export const ClientCheckIn: React.FC = () => {
                         required
                         value={formData.checkOutDate}
                         onChange={(e) => updateField('checkOutDate', e.target.value)}
-                        className="w-full min-h-[52px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
+                        className="w-full min-h-[52px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] font-mono focus:outline-none transition"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                      <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                         Horário de Check-out Previsto *
                       </label>
                       <input
@@ -1178,21 +1172,21 @@ export const ClientCheckIn: React.FC = () => {
                         required
                         value={formData.checkOutTime}
                         onChange={(e) => updateField('checkOutTime', e.target.value)}
-                        className="w-full min-h-[52px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
+                        className="w-full min-h-[52px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] font-mono focus:outline-none transition"
                       />
                     </div>
                   </div>
 
                   {/* Explicit Confirmation Checkbox */}
                   <div className="pt-2">
-                    <label className="flex items-start gap-3 p-3.5 bg-[#FAF7F2] border border-[#E7E2D8] rounded-xl cursor-pointer hover:border-[#D96B43] transition">
+                    <label className="flex items-start gap-3 p-3.5 bg-[#FAF8F9] border border-[#c5b9cd] rounded-xl cursor-pointer hover:border-[#92a8d1] transition">
                       <input
                         type="checkbox"
                         checked={dateConfirmationChecked}
                         onChange={(e) => setDateConfirmationChecked(e.target.checked)}
-                        className="w-5 h-5 mt-0.5 rounded border-[#E7E2D8] text-[#D96B43] focus:ring-[#D96B43] shrink-0"
+                        className="w-5 h-5 mt-0.5 rounded border-[#c5b9cd] text-[#92a8d1] focus:ring-[#92a8d1] shrink-0"
                       />
-                      <span className="text-xs font-semibold text-[#1C1917] leading-relaxed">
+                      <span className="text-xs font-bold text-[#1E293B] leading-relaxed">
                         Confirmo as datas e horários de entrada e saída acima *
                       </span>
                     </label>
@@ -1200,7 +1194,7 @@ export const ClientCheckIn: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-1.5">
                     Observações Específicas Desta Estadia &amp; Pertences Trazidos
                   </label>
                   <textarea
@@ -1208,7 +1202,7 @@ export const ClientCheckIn: React.FC = () => {
                     placeholder="Ex: Trouxe ração em pote vedado, caminha azul, mordedor de borracha e coleira extra."
                     value={formData.specialStayNotes}
                     onChange={(e) => updateField('specialStayNotes', e.target.value)}
-                    className="w-full min-h-[56px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] placeholder-[#A8A29E] focus:outline-none transition"
+                    className="w-full min-h-[56px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-4 py-3 text-base text-[#1E293B] placeholder-[#94A3B8] focus:outline-none transition"
                   />
                 </div>
               </div>
@@ -1217,8 +1211,8 @@ export const ClientCheckIn: React.FC = () => {
             {/* ─────────────────────────────────────────────────────────
                 STICKY BOTTOM ACTION BAR (Thumb-Friendly Ergonomics)
             ───────────────────────────────────────────────────────── */}
-            <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#E7E2D8] p-3 sm:p-4 z-30 shadow-lg">
-              <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+            <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#dec2cb]/60 p-3 sm:p-4 z-30 shadow-lg">
+              <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
                 {subStep === 'tutor_vet' ? (
                   <button
                     type="button"
@@ -1230,9 +1224,9 @@ export const ClientCheckIn: React.FC = () => {
                         setStage('phone_lookup');
                       }
                     }}
-                    className="min-h-[48px] px-4 rounded-xl border border-[#E7E2D8] text-[#78716C] hover:text-[#1C1917] text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
+                    className="min-h-[48px] px-4 rounded-xl border border-[#c5b9cd] bg-white text-[#1E293B] hover:bg-[#FAF8F9] text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <ArrowLeft className="w-3.5 h-3.5 text-[#2D3E5E]" />
                     <span>Início</span>
                   </button>
                 ) : (
@@ -1244,9 +1238,9 @@ export const ClientCheckIn: React.FC = () => {
                       if (subStep === 'behavior_routine') changeSubStep('pet_health');
                       if (subStep === 'photo_stay') changeSubStep('behavior_routine');
                     }}
-                    className="min-h-[48px] px-4 rounded-xl border border-[#E7E2D8] text-[#78716C] hover:text-[#1C1917] text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
+                    className="min-h-[48px] px-4 rounded-xl border border-[#c5b9cd] bg-white text-[#1E293B] hover:bg-[#FAF8F9] text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <ArrowLeft className="w-3.5 h-3.5 text-[#2D3E5E]" />
                     <span>Voltar</span>
                   </button>
                 )}
@@ -1276,10 +1270,10 @@ export const ClientCheckIn: React.FC = () => {
                         changeSubStep('photo_stay');
                       }
                     }}
-                    className="min-h-[48px] px-6 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] active:bg-[#AA4D29] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-sm shadow-[#D96B43]/20 transition cursor-pointer"
+                    className="min-h-[48px] px-6 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] active:scale-[0.99] disabled:opacity-50 text-[#1E293B] text-xs font-bold flex items-center gap-2 shadow-sm border border-[#7b93c2] transition cursor-pointer"
                   >
                     <span>Próximo Passo</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 text-[#1E293B]" />
                   </button>
                 ) : (
                   <button
@@ -1294,7 +1288,7 @@ export const ClientCheckIn: React.FC = () => {
                       !formData.checkOutTime ||
                       !dateConfirmationChecked
                     }
-                    className="min-h-[48px] px-6 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] active:bg-[#AA4D29] disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-md shadow-[#D96B43]/30 flex items-center gap-2 transition cursor-pointer"
+                    className="min-h-[48px] px-6 rounded-xl bg-[#2D3E5E] hover:bg-[#1E293B] active:scale-[0.99] disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 transition cursor-pointer"
                   >
                     {submitting ? (
                       <>
@@ -1303,7 +1297,7 @@ export const ClientCheckIn: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 className="w-4 h-4 text-[#92a8d1]" />
                         <span>Finalizar Check-in</span>
                       </>
                     )}
@@ -1319,50 +1313,50 @@ export const ClientCheckIn: React.FC = () => {
           STAGE 4: Success & Check-in Voucher
       ───────────────────────────────────────────────────────────── */}
       {stage === 'success_confirmation' && submissionSuccessData && (
-        <div className="bg-white border border-[#E7E2D8] rounded-3xl p-6 sm:p-8 shadow-sm space-y-5 text-center">
-          <div className="w-16 h-16 rounded-full bg-[#E8F0EA] border border-[#C5DDCB] text-[#245235] mx-auto flex items-center justify-center shadow-sm">
+        <div className="bg-white border border-[#dec2cb]/60 rounded-3xl p-6 sm:p-8 shadow-sm space-y-5 text-center my-auto">
+          <div className="w-16 h-16 rounded-full bg-[#d2e3d8] border border-[#a3cbb1] text-[#133E26] mx-auto flex items-center justify-center shadow-sm">
             <CheckCircle2 className="w-8 h-8" />
           </div>
 
           <div>
-            <span className="text-[10px] font-bold tracking-widest text-[#245235] bg-[#E8F0EA] px-2.5 py-1 rounded-full uppercase border border-[#C5DDCB]">
+            <span className="text-[10px] font-bold tracking-widest text-[#133E26] bg-[#d2e3d8] px-2.5 py-1 rounded-full uppercase border border-[#a3cbb1]">
               Check-in Confirmado
             </span>
-            <h2 className="text-xl sm:text-2xl font-black text-[#1C1917] mt-2">Ficha Salva no Sistema!</h2>
-            <p className="text-xs sm:text-sm text-[#78716C] max-w-md mx-auto mt-1 leading-relaxed">
+            <h2 className="text-xl sm:text-2xl font-black text-[#1E293B] mt-2">Ficha Salva no Sistema!</h2>
+            <p className="text-xs sm:text-sm text-[#64748B] max-w-md mx-auto mt-1 leading-relaxed">
               Os dados de <strong>{submissionSuccessData.pet.nameAndBreed}</strong> foram salvos e a equipe Mika &amp; Xan já tem acesso à ficha completa.
             </p>
           </div>
 
           {/* Voucher Summary Card */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8] text-left space-y-2.5 text-xs">
-            <div className="flex justify-between border-b border-[#E7E2D8] pb-2">
-              <span className="text-[#78716C]">Pet:</span>
-              <span className="font-bold text-[#1C1917]">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60 text-left space-y-2.5 text-xs">
+            <div className="flex justify-between border-b border-[#dec2cb]/60 pb-2">
+              <span className="text-[#64748B]">Pet:</span>
+              <span className="font-bold text-[#1E293B]">
                 {submissionSuccessData.pet.nameAndBreed}
               </span>
             </div>
-            <div className="flex justify-between border-b border-[#E7E2D8] pb-2">
-              <span className="text-[#78716C]">Tutor Responsável:</span>
-              <span className="font-semibold text-[#1C1917]">
+            <div className="flex justify-between border-b border-[#dec2cb]/60 pb-2">
+              <span className="text-[#64748B]">Tutor Responsável:</span>
+              <span className="font-semibold text-[#1E293B]">
                 {submissionSuccessData.tutor.fullName}
               </span>
             </div>
-            <div className="flex justify-between border-b border-[#E7E2D8] pb-2">
-              <span className="text-[#78716C]">Check-in:</span>
-              <span className="font-medium text-[#D96B43]">
+            <div className="flex justify-between border-b border-[#dec2cb]/60 pb-2">
+              <span className="text-[#64748B]">Check-in:</span>
+              <span className="font-bold text-[#1E293B]">
                 {new Date(submissionSuccessData.stay.checkInDate).toLocaleString('pt-BR')}
               </span>
             </div>
-            <div className="flex justify-between border-b border-[#E7E2D8] pb-2">
-              <span className="text-[#78716C]">Check-out Previsto:</span>
-              <span className="font-medium text-[#1C1917]">
+            <div className="flex justify-between border-b border-[#dec2cb]/60 pb-2">
+              <span className="text-[#64748B]">Check-out Previsto:</span>
+              <span className="font-medium text-[#1E293B]">
                 {new Date(submissionSuccessData.stay.checkOutDate).toLocaleString('pt-BR')}
               </span>
             </div>
             <div className="flex justify-between items-center pt-0.5">
-              <span className="text-[#78716C]">Status Operacional:</span>
-              <span className="px-2 py-0.5 rounded bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] uppercase text-[10px] font-bold">
+              <span className="text-[#64748B]">Status Operacional:</span>
+              <span className="px-2 py-0.5 rounded bg-[#c5b9cd]/40 text-[#1E293B] border border-[#dec2cb] uppercase text-[10px] font-bold">
                 Pendente Confirmação
               </span>
             </div>
@@ -1381,9 +1375,9 @@ export const ClientCheckIn: React.FC = () => {
                 setDateConfirmationChecked(false);
                 setStepTransitionLock(false);
               }}
-              className="w-full sm:w-auto min-w-[260px] min-h-[48px] px-6 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shadow-[#D96B43]/20 transition cursor-pointer"
+              className="w-full sm:w-auto min-w-[260px] min-h-[48px] px-6 rounded-xl bg-[#2D3E5E] hover:bg-[#1E293B] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4 text-[#92a8d1]" />
               <span>Cadastrar Outro Pet / Início</span>
             </button>
           </div>
