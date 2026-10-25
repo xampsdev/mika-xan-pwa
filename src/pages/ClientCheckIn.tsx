@@ -71,7 +71,9 @@ interface FormDataState {
   photoUrl: string;
   // Stay Check-in Details
   checkInDate: string;
+  checkInTime: string;
   checkOutDate: string;
+  checkOutTime: string;
   specialStayNotes: string;
 }
 
@@ -98,8 +100,10 @@ const INITIAL_FORM_STATE: FormDataState = {
   bathProtocol: '',
   generalNotes: '',
   photoUrl: '',
-  checkInDate: new Date().toISOString().slice(0, 16),
-  checkOutDate: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16),
+  checkInDate: '',
+  checkInTime: '',
+  checkOutDate: '',
+  checkOutTime: '',
   specialStayNotes: '',
 };
 
@@ -107,9 +111,20 @@ export const ClientCheckIn: React.FC = () => {
   // Flow State
   const [stage, setStage] = useState<FlowStage>('phone_lookup');
   const [subStep, setSubStep] = useState<FormSubStep>('tutor_vet');
+  const [stepTransitionLock, setStepTransitionLock] = useState<boolean>(false);
+  const [dateConfirmationChecked, setDateConfirmationChecked] = useState<boolean>(false);
   const [lookupPhone, setLookupPhone] = useState<string>('');
   const [lookupLoading, setLookupLoading] = useState<boolean>(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+
+  // Transition Lock Helper (prevents ghost taps on Android touchscreens)
+  const changeSubStep = (next: FormSubStep) => {
+    setStepTransitionLock(true);
+    setSubStep(next);
+    setTimeout(() => {
+      setStepTransitionLock(false);
+    }, 500);
+  };
 
   // Loaded Entities
   const [existingTutor, setExistingTutor] = useState<Tutor | null>(null);
@@ -170,8 +185,11 @@ export const ClientCheckIn: React.FC = () => {
           ...INITIAL_FORM_STATE,
           phoneDDD: formatted,
         });
+        setDateConfirmationChecked(false);
         setSubStep('tutor_vet');
         setStage('intake_form');
+        setStepTransitionLock(true);
+        setTimeout(() => setStepTransitionLock(false), 500);
       }
     } catch (err: unknown) {
       console.warn('Firestore query error (fallback to new intake):', err);
@@ -179,8 +197,11 @@ export const ClientCheckIn: React.FC = () => {
         ...INITIAL_FORM_STATE,
         phoneDDD: formatted,
       });
+      setDateConfirmationChecked(false);
       setSubStep('tutor_vet');
       setStage('intake_form');
+      setStepTransitionLock(true);
+      setTimeout(() => setStepTransitionLock(false), 500);
     } finally {
       setLookupLoading(false);
     }
@@ -213,13 +234,18 @@ export const ClientCheckIn: React.FC = () => {
       bathProtocol: pet.bathProtocol || '',
       generalNotes: pet.generalNotes || '',
       photoUrl: pet.photoUrl || '',
-      checkInDate: new Date().toISOString().slice(0, 16),
-      checkOutDate: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16),
+      checkInDate: '',
+      checkInTime: '',
+      checkOutDate: '',
+      checkOutTime: '',
       specialStayNotes: '',
     });
     setCompressedPreview(pet.photoUrl || null);
+    setDateConfirmationChecked(false);
     setSubStep('tutor_vet');
     setStage('intake_form');
+    setStepTransitionLock(true);
+    setTimeout(() => setStepTransitionLock(false), 500);
   };
 
   // Returning Client: Register new Pet under existing Tutor
@@ -231,12 +257,17 @@ export const ClientCheckIn: React.FC = () => {
       fullName: existingTutor.fullName,
       phoneDDD: existingTutor.phoneDDD,
       vetNameAndPhone: existingTutor.vetNameAndPhone,
-      checkInDate: new Date().toISOString().slice(0, 16),
-      checkOutDate: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16),
+      checkInDate: '',
+      checkInTime: '',
+      checkOutDate: '',
+      checkOutTime: '',
     });
     setCompressedPreview(null);
+    setDateConfirmationChecked(false);
     setSubStep('pet_health');
     setStage('intake_form');
+    setStepTransitionLock(true);
+    setTimeout(() => setStepTransitionLock(false), 500);
   };
 
   // Image Selection & Client-Side Compression (DataURL for Firestore)
@@ -260,8 +291,20 @@ export const ClientCheckIn: React.FC = () => {
   };
 
   // Submission to Firestore
-  const handleFinalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFinalSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (stepTransitionLock || submitting) return;
+
+    if (!formData.checkInDate || !formData.checkInTime || !formData.checkOutDate || !formData.checkOutTime) {
+      alert('Por favor informe as datas e horários completos de Check-in e Check-out.');
+      return;
+    }
+
+    if (!dateConfirmationChecked) {
+      alert('Por favor confirme as datas e horários de entrada e saída marcando a caixa de confirmação.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -330,12 +373,15 @@ export const ClientCheckIn: React.FC = () => {
         petId = newPetRef.id;
       }
 
-      // 4. Create Stay Doc
+      // 4. Create Stay Doc (combined date + time)
+      const checkInCombined = `${formData.checkInDate}T${formData.checkInTime}`;
+      const checkOutCombined = `${formData.checkOutDate}T${formData.checkOutTime}`;
+
       const stayPayload = {
         petId,
         tutorId,
-        checkInDate: formData.checkInDate,
-        checkOutDate: formData.checkOutDate,
+        checkInDate: checkInCombined,
+        checkOutDate: checkOutCombined,
         status: 'pending' as StayStatus,
         specialStayNotes: formData.specialStayNotes.trim(),
         createdAt: serverTimestamp(),
@@ -388,7 +434,7 @@ export const ClientCheckIn: React.FC = () => {
             </p>
           </div>
 
-          <form onSubmit={handlePhoneLookup} className="space-y-4 pt-1">
+          <form onSubmit={(e) => { e.preventDefault(); handlePhoneLookup(); }} className="space-y-4 pt-1">
             <div>
               <label className="block text-xs font-bold text-[#1C1917] uppercase tracking-wider mb-1.5">
                 Telefone com DDD (Campo 2)
@@ -414,7 +460,8 @@ export const ClientCheckIn: React.FC = () => {
             </div>
 
             <button
-              type="submit"
+              type="button"
+              onClick={() => handlePhoneLookup()}
               disabled={lookupLoading || !lookupPhone}
               className="w-full min-h-[48px] px-5 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] active:bg-[#AA4D29] disabled:opacity-50 text-white font-bold text-sm shadow-sm shadow-[#D96B43]/20 flex items-center justify-center gap-2 transition cursor-pointer"
             >
@@ -565,32 +612,36 @@ export const ClientCheckIn: React.FC = () => {
             <div className="grid grid-cols-4 gap-1.5">
               <button
                 type="button"
-                onClick={() => setSubStep('tutor_vet')}
-                className={`h-2 rounded-full transition ${
+                disabled={stepTransitionLock}
+                onClick={() => changeSubStep('tutor_vet')}
+                className={`h-2 rounded-full transition disabled:opacity-50 ${
                   subStep === 'tutor_vet' ? 'bg-[#D96B43]' : 'bg-[#E7E2D8]'
                 }`}
                 title="Tutor & Veterinário"
               />
               <button
                 type="button"
-                onClick={() => setSubStep('pet_health')}
-                className={`h-2 rounded-full transition ${
+                disabled={stepTransitionLock}
+                onClick={() => changeSubStep('pet_health')}
+                className={`h-2 rounded-full transition disabled:opacity-50 ${
                   subStep === 'pet_health' ? 'bg-[#D96B43]' : 'bg-[#E7E2D8]'
                 }`}
                 title="Pet & Saúde"
               />
               <button
                 type="button"
-                onClick={() => setSubStep('behavior_routine')}
-                className={`h-2 rounded-full transition ${
+                disabled={stepTransitionLock}
+                onClick={() => changeSubStep('behavior_routine')}
+                className={`h-2 rounded-full transition disabled:opacity-50 ${
                   subStep === 'behavior_routine' ? 'bg-[#D96B43]' : 'bg-[#E7E2D8]'
                 }`}
                 title="Comportamento & Rotina"
               />
               <button
                 type="button"
-                onClick={() => setSubStep('photo_stay')}
-                className={`h-2 rounded-full transition ${
+                disabled={stepTransitionLock}
+                onClick={() => changeSubStep('photo_stay')}
+                className={`h-2 rounded-full transition disabled:opacity-50 ${
                   subStep === 'photo_stay' ? 'bg-[#D96B43]' : 'bg-[#E7E2D8]'
                 }`}
                 title="Foto & Hospedagem"
@@ -598,7 +649,7 @@ export const ClientCheckIn: React.FC = () => {
             </div>
           </div>
 
-          <form onSubmit={handleFinalSubmit} className="p-4 sm:p-6 space-y-5">
+          <form onSubmit={(e) => e.preventDefault()} className="p-4 sm:p-6 space-y-5">
             {/* ─────────────────────────────────────────────────────────
                 SUBSTEP A: Tutor & Vet Info (Fields 1-3)
             ───────────────────────────────────────────────────────── */}
@@ -1075,31 +1126,76 @@ export const ClientCheckIn: React.FC = () => {
                 </div>
 
                 {/* Stay Check-in Details */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                  <div>
-                    <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
-                      Data e Hora de Check-in *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={formData.checkInDate}
-                      onChange={(e) => updateField('checkInDate', e.target.value)}
-                      className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
-                    />
+                <div className="space-y-3 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                        Data de Check-in *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.checkInDate}
+                        onChange={(e) => updateField('checkInDate', e.target.value)}
+                        className="w-full min-h-[52px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                        Horário de Check-in *
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        value={formData.checkInTime}
+                        onChange={(e) => updateField('checkInTime', e.target.value)}
+                        className="w-full min-h-[52px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
-                      Data e Hora de Check-out Previsto *
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                        Data de Check-out Previsto *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.checkOutDate}
+                        onChange={(e) => updateField('checkOutDate', e.target.value)}
+                        className="w-full min-h-[52px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#1C1917] mb-1.5">
+                        Horário de Check-out Previsto *
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        value={formData.checkOutTime}
+                        onChange={(e) => updateField('checkOutTime', e.target.value)}
+                        className="w-full min-h-[52px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Explicit Confirmation Checkbox */}
+                  <div className="pt-2">
+                    <label className="flex items-start gap-3 p-3.5 bg-[#FAF7F2] border border-[#E7E2D8] rounded-xl cursor-pointer hover:border-[#D96B43] transition">
+                      <input
+                        type="checkbox"
+                        checked={dateConfirmationChecked}
+                        onChange={(e) => setDateConfirmationChecked(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 rounded border-[#E7E2D8] text-[#D96B43] focus:ring-[#D96B43] shrink-0"
+                      />
+                      <span className="text-xs font-semibold text-[#1C1917] leading-relaxed">
+                        Confirmo as datas e horários de entrada e saída acima *
+                      </span>
                     </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={formData.checkOutDate}
-                      onChange={(e) => updateField('checkOutDate', e.target.value)}
-                      className="w-full min-h-[48px] bg-[#FAF7F2] border border-[#E7E2D8] focus:border-[#D96B43] focus:bg-white rounded-xl px-3.5 py-3 text-base text-[#1C1917] font-mono focus:outline-none transition"
-                    />
                   </div>
                 </div>
 
@@ -1126,6 +1222,7 @@ export const ClientCheckIn: React.FC = () => {
                 {subStep === 'tutor_vet' ? (
                   <button
                     type="button"
+                    disabled={stepTransitionLock}
                     onClick={() => {
                       if (existingTutor) {
                         setStage('returning_client');
@@ -1133,7 +1230,7 @@ export const ClientCheckIn: React.FC = () => {
                         setStage('phone_lookup');
                       }
                     }}
-                    className="min-h-[48px] px-4 rounded-xl border border-[#E7E2D8] text-[#78716C] hover:text-[#1C1917] text-xs font-semibold flex items-center gap-1.5 transition"
+                    className="min-h-[48px] px-4 rounded-xl border border-[#E7E2D8] text-[#78716C] hover:text-[#1C1917] text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Início</span>
@@ -1141,12 +1238,13 @@ export const ClientCheckIn: React.FC = () => {
                 ) : (
                   <button
                     type="button"
+                    disabled={stepTransitionLock}
                     onClick={() => {
-                      if (subStep === 'pet_health') setSubStep('tutor_vet');
-                      if (subStep === 'behavior_routine') setSubStep('pet_health');
-                      if (subStep === 'photo_stay') setSubStep('behavior_routine');
+                      if (subStep === 'pet_health') changeSubStep('tutor_vet');
+                      if (subStep === 'behavior_routine') changeSubStep('pet_health');
+                      if (subStep === 'photo_stay') changeSubStep('behavior_routine');
                     }}
-                    className="min-h-[48px] px-4 rounded-xl border border-[#E7E2D8] text-[#78716C] hover:text-[#1C1917] text-xs font-semibold flex items-center gap-1.5 transition"
+                    className="min-h-[48px] px-4 rounded-xl border border-[#E7E2D8] text-[#78716C] hover:text-[#1C1917] text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Voltar</span>
@@ -1156,36 +1254,46 @@ export const ClientCheckIn: React.FC = () => {
                 {subStep !== 'photo_stay' ? (
                   <button
                     type="button"
+                    disabled={stepTransitionLock}
                     onClick={() => {
                       if (subStep === 'tutor_vet') {
                         if (!formData.fullName.trim() || !formData.phoneDDD.trim()) {
                           alert('Por favor preencha o Nome e o WhatsApp do tutor.');
                           return;
                         }
-                        setSubStep('pet_health');
+                        changeSubStep('pet_health');
                       } else if (subStep === 'pet_health') {
                         if (!formData.nameAndBreed.trim() || !formData.ageAndWeight.trim()) {
                           alert('Por favor preencha o Nome/Raça e a Idade/Peso do pet.');
                           return;
                         }
-                        setSubStep('behavior_routine');
+                        changeSubStep('behavior_routine');
                       } else if (subStep === 'behavior_routine') {
                         if (!formData.foodAmountAndSchedule.trim()) {
                           alert('Por favor informe a quantidade e horários da ração.');
                           return;
                         }
-                        setSubStep('photo_stay');
+                        changeSubStep('photo_stay');
                       }
                     }}
-                    className="min-h-[48px] px-6 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] active:bg-[#AA4D29] text-white text-xs font-bold flex items-center gap-2 shadow-sm shadow-[#D96B43]/20 transition cursor-pointer"
+                    className="min-h-[48px] px-6 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] active:bg-[#AA4D29] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-sm shadow-[#D96B43]/20 transition cursor-pointer"
                   >
                     <span>Próximo Passo</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
                   <button
-                    type="submit"
-                    disabled={submitting}
+                    type="button"
+                    onClick={() => handleFinalSubmit()}
+                    disabled={
+                      submitting ||
+                      stepTransitionLock ||
+                      !formData.checkInDate ||
+                      !formData.checkInTime ||
+                      !formData.checkOutDate ||
+                      !formData.checkOutTime ||
+                      !dateConfirmationChecked
+                    }
                     className="min-h-[48px] px-6 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] active:bg-[#AA4D29] disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-md shadow-[#D96B43]/30 flex items-center gap-2 transition cursor-pointer"
                   >
                     {submitting ? (
@@ -1263,12 +1371,15 @@ export const ClientCheckIn: React.FC = () => {
           {/* Return / Register Another Pet Action */}
           <div className="flex justify-center pt-2">
             <button
+              type="button"
               onClick={() => {
                 setStage('phone_lookup');
                 setFormData(INITIAL_FORM_STATE);
                 setLookupPhone('');
                 setSelectedPetId(null);
                 setSubmissionSuccessData(null);
+                setDateConfirmationChecked(false);
+                setStepTransitionLock(false);
               }}
               className="w-full sm:w-auto min-w-[260px] min-h-[48px] px-6 rounded-xl bg-[#D96B43] hover:bg-[#C25B34] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shadow-[#D96B43]/20 transition cursor-pointer"
             >
