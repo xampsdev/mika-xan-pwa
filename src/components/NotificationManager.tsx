@@ -11,20 +11,31 @@ import {
   AlertTriangle,
   Smartphone,
   Loader2,
+  Volume2,
+  Radio,
+  ExternalLink,
+  Send,
 } from 'lucide-react';
 import { getToken } from 'firebase/messaging';
 import { db, doc, setDoc, serverTimestamp, getMessagingInstance, isMockMode } from '@/lib/firebase';
+import { playNotificationChime } from '@/pages/AdminDashboard';
 
 interface NotificationManagerProps {
   adminEmail: string;
 }
 
+const NTFY_TOPIC = 'mika-xan-alerts-xampsbeatz-9921';
+const NTFY_URL = `https://ntfy.sh/${NTFY_TOPIC}`;
+
 export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminEmail }) => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [testingLocal, setTestingLocal] = useState<boolean>(false);
+  const [testingNtfy, setTestingNtfy] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [ntfyFeedback, setNtfyFeedback] = useState<string | null>(null);
 
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
@@ -74,7 +85,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
       setPermission(requestedPermission);
 
       if (requestedPermission !== 'granted') {
-        throw new Error('Permissão de notificação negada pelo usuário.');
+        throw new Error('Permissão de notificação negada no navegador. Habilite nas configurações do site.');
       }
 
       // Step 2: Register Service Worker
@@ -99,7 +110,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
           });
         }
       } catch (tokenErr) {
-        console.warn('FCM token retrieval fallback:', tokenErr);
+        console.warn('FCM token retrieval notice:', tokenErr);
       }
 
       if (!token) {
@@ -124,34 +135,74 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
         { merge: true }
       );
 
-      setSuccessMsg('Notificações de check-in ativadas com sucesso neste dispositivo!');
-    } catch (err: any) {
+      setSuccessMsg('Notificações push ativadas com sucesso! Seu dispositivo receberá novos check-ins.');
+      playNotificationChime();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha ao ativar notificações push.';
       console.warn('Push activation error:', err);
-      setErrorMsg(err?.message || 'Falha ao ativar notificações push.');
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleTestNotification = async () => {
-    if (permission !== 'granted') return;
+    setTestingLocal(true);
+    setErrorMsg(null);
 
     try {
+      // Play audio chime
+      playNotificationChime();
+
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.ready;
-        reg.showNotification('🐾 Mika & Xan Check-in', {
-          body: 'Notificações push estão ativas e funcionando perfeitamente no seu dispositivo!',
-          icon: '/pwa-192x192.png',
-          badge: '/apple-touch-icon.png',
-        });
-      } else {
-        new Notification('🐾 Mika & Xan Check-in', {
-          body: 'Notificações push ativas!',
-          icon: '/pwa-192x192.png',
+        await reg.showNotification('🐾 Mika & Xan: Teste de Notificação', {
+          body: 'Notificações push nativas estão 100% ativas no seu aparelho!',
+          icon: '/icon.svg',
+          badge: '/icon.svg',
+          vibrate: [200, 100, 200],
+          tag: 'test-notification',
+        } as NotificationOptions);
+      } else if ('Notification' in window) {
+        new Notification('🐾 Mika & Xan: Teste de Notificação', {
+          body: 'Notificações push nativas estão 100% ativas no seu aparelho!',
+          icon: '/icon.svg',
         });
       }
+      setSuccessMsg('Alerta de teste enviado com sucesso!');
     } catch (err) {
-      console.error('Test notification failed:', err);
+      console.warn('Test notification warning:', err);
+      setErrorMsg('Não foi possível disparar a notificação de teste.');
+    } finally {
+      setTestingLocal(false);
+    }
+  };
+
+  const handleTestNtfyBridge = async () => {
+    setTestingNtfy(true);
+    setNtfyFeedback(null);
+
+    try {
+      const res = await fetch(NTFY_URL, {
+        method: 'POST',
+        body: 'Alerta de teste 24/7 disparado pelo painel administrativo Mika & Xan.',
+        headers: {
+          Title: '🐾 Teste Alerta 24/7 (Mika & Xan)',
+          Priority: 'high',
+          Tags: 'white_check_mark,bell',
+        },
+      });
+
+      if (res.ok) {
+        setNtfyFeedback('Disparo ntfy.sh enviado! Verifique o app ou site do ntfy.');
+      } else {
+        setNtfyFeedback('Falha ao comunicar com ntfy.sh.');
+      }
+    } catch (err) {
+      console.warn('ntfy test error:', err);
+      setNtfyFeedback('Erro de conexão ao disparar ntfy.');
+    } finally {
+      setTestingNtfy(false);
     }
   };
 
@@ -159,6 +210,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
 
   return (
     <div className="p-4 sm:p-5 rounded-3xl bg-white border border-[#E7E2D8] shadow-sm space-y-4">
+      {/* Primary Push Header & Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
@@ -186,7 +238,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
               </span>
             </div>
             <p className="text-xs text-[#78716C] mt-0.5">
-              Receba alertas no celular sempre que um tutor submeter uma nova ficha de check-in.
+              Receba alertas sonoros no celular sempre que um tutor enviar uma nova ficha de check-in.
             </p>
           </div>
         </div>
@@ -195,9 +247,15 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
           {isConfigured ? (
             <button
               onClick={handleTestNotification}
-              className="w-full sm:w-auto min-h-[44px] px-4 rounded-xl bg-[#FAF7F2] hover:bg-[#F0ECE4] border border-[#E7E2D8] text-[#1C1917] text-xs font-semibold transition"
+              disabled={testingLocal}
+              className="w-full sm:w-auto min-h-[44px] px-4 rounded-xl bg-[#FAF7F2] hover:bg-[#F0ECE4] active:bg-[#E7E2D8] border border-[#E7E2D8] text-[#1C1917] text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
             >
-              Testar Alerta
+              {testingLocal ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D96B43]" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5 text-[#D96B43]" />
+              )}
+              <span>Testar Notificação Agora</span>
             </button>
           ) : (
             <button
@@ -250,6 +308,57 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
           <span>{errorMsg}</span>
         </div>
       )}
+
+      {/* 24/7 Background Push Bridge via ntfy.sh */}
+      <div className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-[#E7E2D8] space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 text-[#D96B43]" />
+            <span className="text-xs font-bold text-[#1C1917]">
+              Ponte 24/7 Anti-Suspensão (ntfy.sh)
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-[#78716C] bg-white px-2 py-0.5 rounded border border-[#E7E2D8]">
+            {NTFY_TOPIC}
+          </span>
+        </div>
+        <p className="text-[11px] text-[#78716C] leading-relaxed">
+          Garante recebimento com toque e vibração mesmo se o Chrome estiver suspenso ou a tela bloqueada.
+          Instale o app gratuito <strong>ntfy</strong> (Play Store / App Store) e inscreva-se no tópico acima.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <a
+            href={NTFY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#F0ECE4] text-[#1C1917] border border-[#E7E2D8] rounded-xl text-xs font-semibold transition"
+          >
+            <span>Abrir Tópico Web</span>
+            <ExternalLink className="w-3 h-3 text-[#78716C]" />
+          </a>
+
+          <button
+            type="button"
+            onClick={handleTestNtfyBridge}
+            disabled={testingNtfy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#F0ECE4] text-[#D96B43] border border-[#E7E2D8] rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            {testingNtfy ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Send className="w-3 h-3" />
+            )}
+            <span>Enviar Teste ntfy</span>
+          </button>
+
+          {ntfyFeedback && (
+            <span className="text-[11px] font-medium text-[#245235]">
+              {ntfyFeedback}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Token Details Info */}
       {fcmToken && (

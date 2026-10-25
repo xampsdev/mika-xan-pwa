@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   auth,
   db,
@@ -41,6 +41,72 @@ import { downloadGeneratedIcons } from '@/lib/pwaIconGenerator';
 // Exclusive Administrator Account (Xan)
 export const ALLOWED_ADMIN_EMAIL = 'xampsbeatz@gmail.com';
 const STORAGE_ADMIN_PASSWORD_KEY = 'mikaxan_admin_password';
+
+// Play dual-tone audio chime (D5 -> A5) via Web Audio API
+export function playNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+
+    gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.15);
+    osc2.start(ctx.currentTime + 0.12);
+    osc2.stop(ctx.currentTime + 0.45);
+  } catch (err) {
+    console.warn('Audio chime warning:', err);
+  }
+}
+
+// Trigger OS notification via active Service Worker or native Web Notification
+export function triggerSystemNotification(stayId?: string) {
+  if (typeof window === 'undefined') return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        reg.showNotification('🐾 Novo Check-in Mika & Xan!', {
+          body: 'Uma nova ficha de hospedagem acabou de chegar no sistema!',
+          icon: '/icon.svg',
+          badge: '/icon.svg',
+          vibrate: [200, 100, 200],
+          tag: stayId ? `stay-${stayId}` : `stay-${Date.now()}`,
+        } as NotificationOptions);
+      })
+      .catch((err) => {
+        console.warn('SW notification dispatch fallback:', err);
+        try {
+          new Notification('🐾 Novo Check-in Mika & Xan!', {
+            body: 'Uma nova ficha de hospedagem acabou de chegar no sistema!',
+            icon: '/icon.svg',
+          });
+        } catch {}
+      });
+  } else {
+    try {
+      new Notification('🐾 Novo Check-in Mika & Xan!', {
+        body: 'Uma nova ficha de hospedagem acabou de chegar no sistema!',
+        icon: '/icon.svg',
+      });
+    } catch {}
+  }
+}
 
 type FilterType = 'all' | 'active' | 'pending';
 
@@ -93,6 +159,9 @@ export const AdminDashboard: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Stays initial load ref to avoid notifying about historical check-ins on first mount
+  const isInitialStaysLoad = useRef<boolean>(true);
+
   // Listen to Firestore real-time snapshots with { includeMetadataChanges: true }
   useEffect(() => {
     if (!currentUser && !isLocalAdminBypass) return;
@@ -116,6 +185,25 @@ export const AdminDashboard: React.FC = () => {
       collection(db, 'stays'),
       { includeMetadataChanges: true },
       (snapshot: any) => {
+        // Only trigger alerts for live additions after initial snapshot
+        if (!isInitialStaysLoad.current && snapshot.docChanges) {
+          try {
+            const changes = typeof snapshot.docChanges === 'function' ? snapshot.docChanges() : [];
+            changes.forEach((change: any) => {
+              if (change.type === 'added') {
+                const stayData = change.doc.data();
+                if (stayData?.status === 'pending') {
+                  playNotificationChime();
+                  triggerSystemNotification(change.doc.id);
+                }
+              }
+            });
+          } catch (changeErr) {
+            console.warn('Stay docChanges warning:', changeErr);
+          }
+        }
+        isInitialStaysLoad.current = false;
+
         const staysList: Stay[] = [];
         snapshot.forEach((docSnap: any) => {
           staysList.push({ id: docSnap.id, ...docSnap.data() } as Stay);

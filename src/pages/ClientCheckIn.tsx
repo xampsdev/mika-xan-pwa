@@ -342,6 +342,17 @@ export const ClientCheckIn: React.FC = () => {
 
       const stayRef = await addDoc(collection(db, 'stays'), stayPayload);
 
+      // Non-blocking 24/7 background push bridge via ntfy.sh (Spark tier compatible)
+      fetch('https://ntfy.sh/mika-xan-alerts-xampsbeatz-9921', {
+        method: 'POST',
+        body: `Novo check-in recebido para ${formData.nameAndBreed.trim()} (Tutor: ${formData.fullName.trim()})`,
+        headers: {
+          Title: '🐾 Novo Check-in Mika & Xan',
+          Priority: 'high',
+          Tags: 'dog,bell',
+        },
+      }).catch((e) => console.warn('ntfy push dispatch failed:', e));
+
       const finalTutorId = tutorId || `tutor_${Date.now()}`;
       const finalPetId = petId || `pet_${Date.now()}`;
 
