@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { formatBrazilianPhone, sanitizePhone, isValidBrazilianPhone } from '@/utils/phone';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
+import { sendNtfyAlert } from '@/lib/ntfy';
 import type { Tutor, Pet, Stay, StayStatus } from '@/types/schema';
 
 type FlowStage = 'phone_lookup' | 'returning_client' | 'intake_form' | 'success_confirmation';
@@ -342,17 +343,6 @@ export const ClientCheckIn: React.FC = () => {
 
       const stayRef = await addDoc(collection(db, 'stays'), stayPayload);
 
-      // Non-blocking 24/7 background push bridge via ntfy.sh (Spark tier compatible)
-      fetch('https://ntfy.sh/mika-xan-alerts-xampsbeatz-9921', {
-        method: 'POST',
-        body: `Novo check-in recebido para ${formData.nameAndBreed.trim()} (Tutor: ${formData.fullName.trim()})`,
-        headers: {
-          Title: '🐾 Novo Check-in Mika & Xan',
-          Priority: 'high',
-          Tags: 'dog,bell',
-        },
-      }).catch((e) => console.warn('ntfy push dispatch failed:', e));
-
       const finalTutorId = tutorId || `tutor_${Date.now()}`;
       const finalPetId = petId || `pet_${Date.now()}`;
 
@@ -361,6 +351,12 @@ export const ClientCheckIn: React.FC = () => {
         pet: { id: finalPetId, ...petPayload, tutorId: finalTutorId, createdAt: new Date() },
         stay: { id: stayRef.id, ...stayPayload, tutorId: finalTutorId, petId: finalPetId, createdAt: new Date() },
       });
+
+      // CORS-safe 24/7 background push alert (Spark tier compatible)
+      await sendNtfyAlert(
+        'Novo Check-in Mika & Xan!',
+        `Pet: ${formData.nameAndBreed.trim()} | Tutor: ${formData.fullName.trim()}`
+      );
 
       setStage('success_confirmation');
     } catch (err: unknown) {

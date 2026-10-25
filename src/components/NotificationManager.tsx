@@ -19,13 +19,11 @@ import {
 import { getToken } from 'firebase/messaging';
 import { db, doc, setDoc, serverTimestamp, getMessagingInstance, isMockMode } from '@/lib/firebase';
 import { playNotificationChime } from '@/pages/AdminDashboard';
+import { sendNtfyAlert, NTFY_TOPIC, NTFY_WEB_URL } from '@/lib/ntfy';
 
 interface NotificationManagerProps {
   adminEmail: string;
 }
-
-const NTFY_TOPIC = 'mika-xan-alerts-xampsbeatz-9921';
-const NTFY_URL = `https://ntfy.sh/${NTFY_TOPIC}`;
 
 export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminEmail }) => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
@@ -183,21 +181,8 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
     setNtfyFeedback(null);
 
     try {
-      const res = await fetch(NTFY_URL, {
-        method: 'POST',
-        body: 'Alerta de teste 24/7 disparado pelo painel administrativo Mika & Xan.',
-        headers: {
-          Title: '🐾 Teste Alerta 24/7 (Mika & Xan)',
-          Priority: 'high',
-          Tags: 'white_check_mark,bell',
-        },
-      });
-
-      if (res.ok) {
-        setNtfyFeedback('Disparo ntfy.sh enviado! Verifique o app ou site do ntfy.');
-      } else {
-        setNtfyFeedback('Falha ao comunicar com ntfy.sh.');
-      }
+      await sendNtfyAlert('Teste Mika & Xan', 'O alerta no seu Android está funcionando 100%!');
+      setNtfyFeedback('Disparo ntfy enviado com sucesso! Verifique seu app ntfy.');
     } catch (err) {
       console.warn('ntfy test error:', err);
       setNtfyFeedback('Erro de conexão ao disparar ntfy.');
@@ -329,7 +314,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <a
-            href={NTFY_URL}
+            href={NTFY_WEB_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#F0ECE4] text-[#1C1917] border border-[#E7E2D8] rounded-xl text-xs font-semibold transition"
@@ -349,7 +334,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
             ) : (
               <Send className="w-3 h-3" />
             )}
-            <span>Enviar Teste ntfy</span>
+            <span>Testar Push (ntfy)</span>
           </button>
 
           {ntfyFeedback && (

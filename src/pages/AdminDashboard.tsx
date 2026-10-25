@@ -32,11 +32,13 @@ import {
   Users,
   X,
   Download,
+  Radio,
 } from 'lucide-react';
 import type { Pet, Tutor, Stay } from '@/types/schema';
 import { PetDetailModal } from '@/components/PetDetailModal';
 import { NotificationManager } from '@/components/NotificationManager';
 import { downloadGeneratedIcons } from '@/lib/pwaIconGenerator';
+import { sendNtfyAlert } from '@/lib/ntfy';
 
 // Exclusive Administrator Account (Xan)
 export const ALLOWED_ADMIN_EMAIL = 'xampsbeatz@gmail.com';
@@ -127,6 +129,7 @@ export const AdminDashboard: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [changePasswordFeedback, setChangePasswordFeedback] = useState<string | null>(null);
   const [downloadingIcons, setDownloadingIcons] = useState<boolean>(false);
+  const [testingHeaderNtfy, setTestingHeaderNtfy] = useState<boolean>(false);
 
   // Firestore Real-time Collections State
   const [pets, setPets] = useState<Pet[]>([]);
@@ -673,6 +676,28 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={async () => {
+              setTestingHeaderNtfy(true);
+              try {
+                await sendNtfyAlert('Teste Mika & Xan', 'O alerta no seu Android está funcionando 100%!');
+              } finally {
+                setTestingHeaderNtfy(false);
+              }
+            }}
+            disabled={testingHeaderNtfy}
+            className="min-h-[38px] inline-flex items-center gap-1.5 px-3 rounded-xl bg-white hover:bg-[#FAF7F2] border border-[#E7E2D8] text-[#D96B43] hover:text-[#C25B34] text-xs font-semibold transition cursor-pointer"
+            title="Disparar alerta de teste instantâneo para o aplicativo ntfy no Android"
+          >
+            {testingHeaderNtfy ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D96B43]" />
+            ) : (
+              <Radio className="w-3.5 h-3.5 text-[#D96B43]" />
+            )}
+            <span className="hidden sm:inline">Testar Push (ntfy)</span>
+            <span className="sm:hidden">Push ntfy</span>
+          </button>
+
           <button
             onClick={handleDownloadPwaIcons}
             disabled={downloadingIcons}
