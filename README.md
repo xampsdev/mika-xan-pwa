@@ -7,6 +7,12 @@
 
 ---
 
+## Demonstração em Produção
+
+https://github.com/user-attachments/assets/46ac3e46-bad0-4f76-bd28-4654081f61da
+
+---
+
 ## O Problema e a Solução
 
 Antes deste projeto, o processo de pré-check-in dos cães hospedados em casa dependia de formulários terceirizados estáticos (`forms.app`) que enviavam respostas avulsas por e-mail. Isso gerava três gargalos operacionais:
