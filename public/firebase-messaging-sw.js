@@ -3,45 +3,85 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Firebase Cloud Messaging Service Worker for background push notifications
-importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
+// Parse Firebase config dynamically from registration URL query parameters (avoids hardcoded keys)
+const swUrl = new URL(self.location.href);
+const apiKey = swUrl.searchParams.get('apiKey');
+const projectId = swUrl.searchParams.get('projectId');
+const messagingSenderId = swUrl.searchParams.get('messagingSenderId');
+const appId = swUrl.searchParams.get('appId');
+const authDomain = swUrl.searchParams.get('authDomain');
+const storageBucket = swUrl.searchParams.get('storageBucket');
 
-// Initialize Firebase inside the Service Worker
-firebase.initializeApp({
-  apiKey: 'AIzaSyDqe7sAl4OPUJeT0p_1qau0xqatVFpZb8c',
-  authDomain: 'mika-xan-pets.firebaseapp.com',
-  projectId: 'mika-xan-pets',
-  storageBucket: 'mika-xan-pets.firebasestorage.app',
-  messagingSenderId: '148546515294',
-  appId: '1:148546515294:web:78482a1b8165b0ad8e1fcf',
-});
+if (apiKey && projectId) {
+  try {
+    importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+    importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
-const messaging = firebase.messaging();
+    firebase.initializeApp({
+      apiKey,
+      authDomain: authDomain || `${projectId}.firebaseapp.com`,
+      projectId,
+      storageBucket: storageBucket || `${projectId}.firebasestorage.app`,
+      messagingSenderId: messagingSenderId || '',
+      appId: appId || '',
+    });
 
-// Handle background notifications pushed from Firebase Cloud Messaging
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message:', payload);
+    const messaging = firebase.messaging();
+    messaging.onBackgroundMessage((payload) => {
+      console.log('[firebase-messaging-sw.js] Background FCM message:', payload);
 
-  const title = payload.notification?.title || payload.data?.title || '🐾 Mika & Xan - Check-in';
-  const options = {
-    body: payload.notification?.body || payload.data?.body || 'Um novo pet realizou check-in no sistema.',
-    icon: '/pwa-192x192.png',
-    badge: '/apple-touch-icon.png',
-    tag: payload.data?.stayId || 'mika-xan-checkin',
-    data: {
-      url: payload.data?.url || '/?view=admin',
-      stayId: payload.data?.stayId || '',
-    },
-    actions: [
-      {
-        action: 'open_admin',
-        title: 'Ver no Painel',
+      const title = payload.notification?.title || payload.data?.title || '🐾 Mika & Xan - Check-in';
+      const options = {
+        body: payload.notification?.body || payload.data?.body || 'Um novo pet realizou check-in no sistema.',
+        icon: '/pwa-192x192.png',
+        badge: '/apple-touch-icon.png',
+        tag: payload.data?.stayId || 'mika-xan-checkin',
+        data: {
+          url: payload.data?.url || '/?view=admin',
+          stayId: payload.data?.stayId || '',
+        },
+        actions: [
+          {
+            action: 'open_admin',
+            title: 'Ver no Painel',
+          },
+        ],
+      };
+
+      return self.registration.showNotification(title, options);
+    });
+  } catch (err) {
+    console.warn('[firebase-messaging-sw.js] Firebase SDK init notice:', err);
+  }
+}
+
+// Standard Web Push Event Handler (functions independently without requiring hardcoded Firebase credentials)
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  try {
+    const payload = event.data.json();
+    const title = payload.title || payload.notification?.title || '🐾 Mika & Xan - Check-in';
+    const options = {
+      body: payload.body || payload.notification?.body || 'Um novo check-in acabou de chegar no sistema.',
+      icon: '/pwa-192x192.png',
+      badge: '/apple-touch-icon.png',
+      tag: payload.tag || payload.data?.stayId || 'mika-xan-alert',
+      data: {
+        url: payload.url || payload.data?.url || '/?view=admin',
+        stayId: payload.stayId || payload.data?.stayId || '',
       },
-    ],
-  };
-
-  return self.registration.showNotification(title, options);
+      vibrate: [200, 100, 200],
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch {
+    const text = event.data.text();
+    event.waitUntil(
+      self.registration.showNotification('🐾 Mika & Xan', {
+        body: text,
+        icon: '/pwa-192x192.png',
+      })
+    );
+  }
 });
 
 // Handle notification click to focus existing tab or open admin route

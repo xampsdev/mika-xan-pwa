@@ -89,19 +89,26 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
       // Step 2: Register Service Worker
       let swRegistration: ServiceWorkerRegistration | undefined;
       if ('serviceWorker' in navigator) {
-        swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const swParams = new URLSearchParams();
+        if (import.meta.env.VITE_FIREBASE_API_KEY) swParams.set('apiKey', import.meta.env.VITE_FIREBASE_API_KEY);
+        if (import.meta.env.VITE_FIREBASE_PROJECT_ID) swParams.set('projectId', import.meta.env.VITE_FIREBASE_PROJECT_ID);
+        if (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID) swParams.set('messagingSenderId', import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID);
+        if (import.meta.env.VITE_FIREBASE_APP_ID) swParams.set('appId', import.meta.env.VITE_FIREBASE_APP_ID);
+        if (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN) swParams.set('authDomain', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
+        if (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET) swParams.set('storageBucket', import.meta.env.VITE_FIREBASE_STORAGE_BUCKET);
+        const swUrl = swParams.toString() ? `/firebase-messaging-sw.js?${swParams.toString()}` : '/firebase-messaging-sw.js';
+
+        swRegistration = await navigator.serviceWorker.register(swUrl);
         await navigator.serviceWorker.ready;
       }
 
       // Step 3: Retrieve FCM Token
-      const vapidKey =
-        import.meta.env.VITE_FIREBASE_VAPID_KEY ||
-        'BPYn7sZOYKOmLCEPzttfr4Spvch-HjMoiAzlUjkEHrzxEWmQVDwOJa03bYBB53PVXlEqWilAjknh1xezosxbP44';
+      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 
       let token: string | null = null;
       try {
         const messaging = await getMessagingInstance();
-        if (messaging && !isMockMode) {
+        if (messaging && !isMockMode && vapidKey) {
           token = await getToken(messaging, {
             vapidKey,
             serviceWorkerRegistration: swRegistration,
@@ -123,7 +130,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
         tokenDocRef,
         {
           token,
-          adminEmail: adminEmail || 'xampsbeatz@gmail.com',
+          adminEmail: adminEmail || 'admin',
           deviceType: isIOS ? 'ios_safari_pwa' : 'android_or_desktop',
           userAgent: navigator.userAgent,
           createdAt: serverTimestamp(),

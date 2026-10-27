@@ -43,21 +43,25 @@ import {
 import { getMessaging, isSupported, type Messaging } from 'firebase/messaging';
 import { mockStore } from '@/lib/mockStore';
 
-const rawApiKey = import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyDqe7sAl4OPUJeT0p_1qau0xqatVFpZb8c';
+const rawApiKey = import.meta.env.VITE_FIREBASE_API_KEY || '';
 
 /**
  * Determine if running in local offline mock mode.
  * Activates when API key is missing or set to placeholder/demo values in AI Studio.
  */
-export const isMockMode = false;
+export const isMockMode =
+  !rawApiKey ||
+  rawApiKey === '' ||
+  rawApiKey.includes('placeholder') ||
+  rawApiKey.includes('your_firebase_api_key_here');
 
 const firebaseConfig = {
   apiKey: rawApiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'mika-xan-pets.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'mika-xan-pets',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'mika-xan-pets.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '148546515294',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:148546515294:web:78482a1b8165b0ad8e1fcf',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
 };
 
 // Initialize base Firebase App
