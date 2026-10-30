@@ -31,6 +31,7 @@ O **Mika & Xan PWA** resolve esse fluxo unificando o formulário público inteli
 * **Auto-Preenchimento de Retorno:** Clientes recorrentes selecionam seu pet cadastrado, revisam as 22 informações de saúde e rotina em etapas organizadas e agendam um novo check-in em segundos.
 * **Agendamento Anti-Ghost Click (Android/iOS):** Etapa final dedicada com seletores nativos de data e horário de entrada/saída e trava de transição de toque (`stepTransitionLock`), evitando submissões acidentais em telas mobile.
 * **Compressão de Imagem Client-Side:** Fotos enviadas pelos tutores são redimensionadas e convertidas via HTML5 Canvas (`DataURL/WebP`) no próprio navegador, garantindo envio instantâneo (< 1s).
+* **Motor de Precificação Dinâmica (Ciclos de 24h e Feriados):** Cálculo automatizado de estadias baseado em janelas reais de 24 horas e frações de meia diária, diferenciando tarifas de dias úteis (Seg-Qui) vs. finais de semana e feriados nacionais/locais (incluindo cálculo algorítmico de feriados móveis como Carnaval, Sexta-Feira Santa e Corpus Christi).
 
 ### Painel Administrativo Offline-First e Zero-Trust
 * **Autenticação Blindada (Session-Only e Rate Limit):** Login administrativo sem exposição de credenciais pré-preenchidas, com encerramento automático de sessão ao sair da aba (`inMemoryPersistence`), bloqueio temporário após tentativas falhas e validação estrita via `firestore.rules`.
