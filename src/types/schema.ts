@@ -115,6 +115,39 @@ export interface Pet {
 export type StayStatus = 'pending' | 'active' | 'completed';
 
 /**
+ * Breakdown item for each 24-hour cycle or overtime block.
+ */
+export interface PricingCycleBreakdown {
+  cycleIndex: number;
+  type: 'full_cycle' | 'overtime_half_day' | 'overtime_full_day' | 'same_day_minimum' | 'tolerance_courtesy';
+  dateLabel: string;
+  dateKey: string;
+  dayOfWeek: number;
+  isWeekendOrHoliday: boolean;
+  holidayName?: string | null;
+  rate: number;
+  description: string;
+  hoursCovered: number;
+}
+
+/**
+ * Complete pricing calculation result for a stay.
+ */
+export interface StayPricingCalculation {
+  checkInDateTime: string;
+  checkOutDateTime: string;
+  totalHours: number;
+  fullCycles: number;
+  extraHours: number;
+  overtimeType: 'none' | 'tolerance' | 'half_day' | 'full_day';
+  estimatedTotal: number;
+  hasHalfDay: boolean;
+  fullDaysCount: number;
+  cyclesBreakdown: PricingCycleBreakdown[];
+  summaryText: string;
+}
+
+/**
  * Relational Collection 3: Stay (Check-in History)
  * Normalizes stay dates, real-time boarding state, and per-visit instructions.
  */
@@ -142,6 +175,21 @@ export interface Stay {
 
   /** Private admin operational notes about this stay (observations, incidents, boarding behavior) */
   adminStayNotes?: string;
+
+  /** Estimated pricing calculated automatically by 24h cycle engine (R$) */
+  estimatedTotal?: number;
+
+  /** Final agreed total price (editable by Admin in R$) */
+  finalTotal?: number;
+
+  /** Total calculated duration in hours */
+  totalHours?: number;
+
+  /** Detailed breakdown object from 24h cycle engine */
+  pricingBreakdown?: StayPricingCalculation;
+
+  /** Reason or note if Admin adjusted the price (e.g., Cortesia, Desconto especial) */
+  adminPricingAdjustmentReason?: string;
 
   /** Document creation timestamp */
   createdAt: FirestoreDateTime;

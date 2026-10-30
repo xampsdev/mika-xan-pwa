@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   db,
   collection,
@@ -14,6 +14,7 @@ import {
   setDoc,
   addDoc,
   serverTimestamp,
+  deepCleanUndefined,
 } from '@/lib/firebase';
 import {
   Search,
@@ -29,10 +30,14 @@ import {
   Utensils,
   Loader2,
   RotateCcw,
+  Calculator,
+  Receipt,
+  Sparkles,
 } from 'lucide-react';
 import { formatBrazilianPhone, isValidBrazilianPhone } from '@/utils/phone';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
 import { sendNtfyAlert } from '@/lib/ntfy';
+import { calculateStayPricing, formatBRL } from '@/lib/pricingCalculator';
 import type { Tutor, Pet, Stay, StayStatus } from '@/types/schema';
 
 type FlowStage = 'phone_lookup' | 'returning_client' | 'intake_form' | 'success_confirmation';
@@ -135,6 +140,16 @@ export const ClientCheckIn: React.FC = () => {
     pet: Pet;
     stay: Stay;
   } | null>(null);
+
+  // Live 24-Hour Cycle + Half-Day Dynamic Pricing Quote
+  const livePricingQuote = useMemo(() => {
+    return calculateStayPricing(
+      formData.checkInDate,
+      formData.checkInTime,
+      formData.checkOutDate,
+      formData.checkOutTime
+    );
+  }, [formData.checkInDate, formData.checkInTime, formData.checkOutDate, formData.checkOutTime]);
 
   // 1. Phone Lookup Handler
   const handlePhoneLookup = async (e?: React.FormEvent) => {
@@ -304,20 +319,20 @@ export const ClientCheckIn: React.FC = () => {
     try {
       // 1. Resolve Tutor Doc
       let tutorId = existingTutor?.id;
-      const tutorPayload = {
-        fullName: formData.fullName.trim(),
-        phoneDDD: formatBrazilianPhone(formData.phoneDDD),
-        vetNameAndPhone: formData.vetNameAndPhone.trim(),
+      const tutorPayload = deepCleanUndefined({
+        fullName: (formData.fullName || '').trim(),
+        phoneDDD: formatBrazilianPhone(formData.phoneDDD || ''),
+        vetNameAndPhone: (formData.vetNameAndPhone || '').trim(),
         updatedAt: serverTimestamp(),
-      };
+      });
 
       if (tutorId) {
-        await setDoc(doc(db, 'tutors', tutorId), tutorPayload, { merge: true });
+        await setDoc(doc(db, 'tutors', tutorId), deepCleanUndefined(tutorPayload), { merge: true });
       } else {
-        const newTutorRef = await addDoc(collection(db, 'tutors'), {
+        const newTutorRef = await addDoc(collection(db, 'tutors'), deepCleanUndefined({
           ...tutorPayload,
           createdAt: serverTimestamp(),
-        });
+        }));
         tutorId = newTutorRef.id;
       }
 
@@ -333,69 +348,86 @@ export const ClientCheckIn: React.FC = () => {
 
       // 3. Resolve Pet Doc
       let petId = selectedPetId;
-      const petPayload = {
-        tutorId,
-        nameAndBreed: formData.nameAndBreed.trim(),
-        ageAndWeight: formData.ageAndWeight.trim(),
-        isNeutered: formData.isNeutered,
-        behaviorPeopleAndAnimals: formData.behaviorPeopleAndAnimals.trim(),
-        allergiesAndProtocol: formData.allergiesAndProtocol.trim(),
-        continuousTreatmentDetails: formData.continuousTreatmentDetails.trim(),
-        dietaryOrPhysicalRestrictions: formData.dietaryOrPhysicalRestrictions.trim(),
-        pastSevereIllnessOrChronic: formData.pastSevereIllnessOrChronic.trim(),
-        vaccinationUpToDate: formData.vaccinationUpToDate,
-        calmWhenAlone: formData.calmWhenAlone,
-        destroysOrIngestsObjects: formData.destroysOrIngestsObjects,
-        foodAmountAndSchedule: formData.foodAmountAndSchedule.trim(),
-        treatsAndNaturalDiet: formData.treatsAndNaturalDiet.trim(),
-        walkFrequencyAndDuration: formData.walkFrequencyAndDuration.trim(),
-        sleepBedAndLocation: formData.sleepBedAndLocation.trim(),
-        pottyTrained: formData.pottyTrained,
-        bathProtocol: formData.bathProtocol.trim(),
-        generalNotes: formData.generalNotes.trim(),
+      const resolvedTutorId = tutorId || `tutor_${Date.now()}`;
+      const petPayload = deepCleanUndefined({
+        tutorId: resolvedTutorId,
+        nameAndBreed: (formData.nameAndBreed || '').trim(),
+        ageAndWeight: (formData.ageAndWeight || '').trim(),
+        isNeutered: Boolean(formData.isNeutered),
+        behaviorPeopleAndAnimals: (formData.behaviorPeopleAndAnimals || '').trim(),
+        allergiesAndProtocol: (formData.allergiesAndProtocol || '').trim(),
+        continuousTreatmentDetails: (formData.continuousTreatmentDetails || '').trim(),
+        dietaryOrPhysicalRestrictions: (formData.dietaryOrPhysicalRestrictions || '').trim(),
+        pastSevereIllnessOrChronic: (formData.pastSevereIllnessOrChronic || '').trim(),
+        vaccinationUpToDate: Boolean(formData.vaccinationUpToDate),
+        calmWhenAlone: Boolean(formData.calmWhenAlone),
+        destroysOrIngestsObjects: Boolean(formData.destroysOrIngestsObjects),
+        foodAmountAndSchedule: (formData.foodAmountAndSchedule || '').trim(),
+        treatsAndNaturalDiet: (formData.treatsAndNaturalDiet || '').trim(),
+        walkFrequencyAndDuration: (formData.walkFrequencyAndDuration || '').trim(),
+        sleepBedAndLocation: (formData.sleepBedAndLocation || '').trim(),
+        pottyTrained: Boolean(formData.pottyTrained),
+        bathProtocol: (formData.bathProtocol || '').trim(),
+        generalNotes: (formData.generalNotes || '').trim(),
         photoUrl: uploadedPhotoUrl || '',
         updatedAt: serverTimestamp(),
-      };
+      });
 
       if (petId) {
-        await setDoc(doc(db, 'pets', petId), petPayload, { merge: true });
+        await setDoc(doc(db, 'pets', petId), deepCleanUndefined(petPayload), { merge: true });
       } else {
-        const newPetRef = await addDoc(collection(db, 'pets'), {
+        const newPetRef = await addDoc(collection(db, 'pets'), deepCleanUndefined({
           ...petPayload,
           createdAt: serverTimestamp(),
-        });
+        }));
         petId = newPetRef.id;
       }
 
-      // 4. Create Stay Doc (combined date + time)
-      const checkInCombined = `${formData.checkInDate}T${formData.checkInTime}`;
-      const checkOutCombined = `${formData.checkOutDate}T${formData.checkOutTime}`;
+      // 4. Create Stay Doc (combined date + time) with 24h Cycle Pricing
+      const resolvedPetId = petId || `pet_${Date.now()}`;
+      const safeCheckInDate = formData.checkInDate || '';
+      const safeCheckInTime = formData.checkInTime || '08:00';
+      const safeCheckOutDate = formData.checkOutDate || '';
+      const safeCheckOutTime = formData.checkOutTime || '18:00';
+      const checkInCombined = `${safeCheckInDate}T${safeCheckInTime}`;
+      const checkOutCombined = `${safeCheckOutDate}T${safeCheckOutTime}`;
 
-      const stayPayload = {
-        petId,
-        tutorId,
+      const pricing = calculateStayPricing(
+        safeCheckInDate,
+        safeCheckInTime,
+        safeCheckOutDate,
+        safeCheckOutTime
+      );
+
+      const cleanedPricingBreakdown = pricing ? deepCleanUndefined(pricing) : null;
+
+      const stayPayload: Omit<Stay, 'id'> = deepCleanUndefined({
+        petId: resolvedPetId,
+        tutorId: resolvedTutorId,
         checkInDate: checkInCombined,
         checkOutDate: checkOutCombined,
         status: 'pending' as StayStatus,
-        specialStayNotes: formData.specialStayNotes.trim(),
+        specialStayNotes: (formData.specialStayNotes || '').trim(),
+        estimatedTotal: pricing?.estimatedTotal ?? 0,
+        finalTotal: pricing?.estimatedTotal ?? 0,
+        totalHours: pricing?.totalHours ?? 0,
+        ...(cleanedPricingBreakdown ? { pricingBreakdown: cleanedPricingBreakdown } : {}),
         createdAt: serverTimestamp(),
-      };
-
-      const stayRef = await addDoc(collection(db, 'stays'), stayPayload);
-
-      const finalTutorId = tutorId || `tutor_${Date.now()}`;
-      const finalPetId = petId || `pet_${Date.now()}`;
-
-      setSubmissionSuccessData({
-        tutor: { id: finalTutorId, ...tutorPayload, createdAt: new Date() },
-        pet: { id: finalPetId, ...petPayload, tutorId: finalTutorId, createdAt: new Date() },
-        stay: { id: stayRef.id, ...stayPayload, tutorId: finalTutorId, petId: finalPetId, createdAt: new Date() },
       });
 
-      // CORS-safe 24/7 background push alert (Spark tier compatible)
+      const stayRef = await addDoc(collection(db, 'stays'), deepCleanUndefined(stayPayload));
+
+      setSubmissionSuccessData({
+        tutor: { id: resolvedTutorId, ...tutorPayload, createdAt: new Date() },
+        pet: { id: resolvedPetId, ...petPayload, tutorId: resolvedTutorId, createdAt: new Date() },
+        stay: { id: stayRef.id, ...stayPayload, tutorId: resolvedTutorId, petId: resolvedPetId, createdAt: new Date() },
+      });
+
+      // CORS-safe 24/7 background push alert with estimated pricing
+      const priceText = pricing ? ` • Total: ${formatBRL(pricing.estimatedTotal)}` : '';
       await sendNtfyAlert(
         'Novo Check-in Mika & Xan!',
-        `Pet: ${formData.nameAndBreed.trim()} | Tutor: ${formData.fullName.trim()}`
+        `Pet: ${formData.nameAndBreed.trim()} | Tutor: ${formData.fullName.trim()}${priceText}`
       );
 
       setStage('success_confirmation');
@@ -1177,6 +1209,90 @@ export const ClientCheckIn: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Live 24h Cycle Pricing Quote Card */}
+                  <div className="rounded-2xl border border-[#dec2cb] bg-white overflow-hidden shadow-xs transition">
+                    <div className="bg-gradient-to-r from-[#f7cac9] via-[#c5b9cd] to-[#92a8d1] px-4 py-2.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[#1E293B] font-bold text-xs uppercase tracking-wider">
+                        <Calculator className="w-4 h-4 text-[#2D3E5E]" />
+                        <span>Resumo do Valor da Hospedagem</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-[#1E293B] bg-white/70 px-2 py-0.5 rounded-full border border-white/80">
+                        Ciclos de 24h
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 space-y-3">
+                      {livePricingQuote ? (
+                        <>
+                          <div className="flex items-center justify-between bg-[#FAF8F9] p-2.5 rounded-xl border border-[#dec2cb]/60">
+                            <div>
+                              <span className="text-[10px] font-bold text-[#64748B] uppercase block">
+                                Duração Calculada
+                              </span>
+                              <span className="text-xs font-bold text-[#1E293B]">
+                                {livePricingQuote.totalHours}h ({livePricingQuote.summaryText})
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-semibold text-[#2D3E5E] bg-[#c5b9cd]/30 px-2.5 py-1 rounded-lg border border-[#dec2cb]">
+                              {livePricingQuote.fullCycles} {livePricingQuote.fullCycles === 1 ? 'diária' : 'diárias'}
+                              {livePricingQuote.hasHalfDay ? ' + meia' : ''}
+                            </span>
+                          </div>
+
+                          {/* Step-by-step breakdown list */}
+                          <div className="space-y-1.5 text-xs">
+                            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
+                              Detalhamento dos Ciclos:
+                            </span>
+                            {livePricingQuote.cyclesBreakdown.map((cycle, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#FAF8F9] border border-[#dec2cb]/40 text-xs"
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#92a8d1] shrink-0" />
+                                  <span className="text-[#1E293B] font-medium truncate">
+                                    {cycle.description}
+                                  </span>
+                                </div>
+                                <span className="font-bold text-[#1E293B] shrink-0 font-mono">
+                                  {cycle.rate === 0 ? 'Cortesia' : formatBRL(cycle.rate)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Total Value */}
+                          <div className="pt-2 border-t border-[#dec2cb]/60 flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-bold text-[#64748B] block">
+                                Valor Total Estimado
+                              </span>
+                              <span className="text-[10px] text-[#64748B]">
+                                Seg-Qui: R$ 79 • Sex-Dom/Feriado: R$ 89
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-lg font-black text-[#1E293B] text-right block">
+                                {formatBRL(livePricingQuote.estimatedTotal)}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="py-2 text-center text-xs text-[#64748B] flex flex-col items-center justify-center gap-1">
+                          <Receipt className="w-5 h-5 text-[#92a8d1]" />
+                          <p className="font-medium text-[#1E293B]">
+                            Preencha as datas e horários acima para calcular o valor
+                          </p>
+                          <p className="text-[11px] text-[#64748B]">
+                            Cálculo dinâmico baseado em ciclos de 24h e meia diária para até 6h extras.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Explicit Confirmation Checkbox */}
                   <div className="pt-2">
                     <label className="flex items-start gap-3 p-3.5 bg-[#FAF8F9] border border-[#c5b9cd] rounded-xl cursor-pointer hover:border-[#92a8d1] transition">
@@ -1354,6 +1470,14 @@ export const ClientCheckIn: React.FC = () => {
                 {new Date(submissionSuccessData.stay.checkOutDate).toLocaleString('pt-BR')}
               </span>
             </div>
+            {submissionSuccessData.stay.estimatedTotal !== undefined && (
+              <div className="flex justify-between border-b border-[#dec2cb]/60 pb-2 bg-[#92a8d1]/10 px-2 py-1.5 rounded-lg">
+                <span className="text-[#1E293B] font-semibold">Valor Estimado ({submissionSuccessData.stay.totalHours}h):</span>
+                <span className="font-black text-[#1E293B]">
+                  {formatBRL(submissionSuccessData.stay.estimatedTotal)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center pt-0.5">
               <span className="text-[#64748B]">Status Operacional:</span>
               <span className="px-2 py-0.5 rounded bg-[#c5b9cd]/40 text-[#1E293B] border border-[#dec2cb] uppercase text-[10px] font-bold">

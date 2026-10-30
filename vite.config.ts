@@ -25,8 +25,8 @@ export default defineConfig(() => {
           short_name: 'Mika & Xan',
           description:
             'Sistema de gestão e ficha cadastral para hospedagem pet com suporte offline e histórico de estadias.',
-          theme_color: '#D96B43',
-          background_color: '#FAF7F2',
+          theme_color: '#92a8d1',
+          background_color: '#FAF8F9',
           display: 'standalone',
           display_override: ['standalone', 'minimal-ui'],
           start_url: '/',
@@ -67,6 +67,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,json}'],
           runtimeCaching: [
             {

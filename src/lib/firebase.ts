@@ -67,12 +67,37 @@ const firebaseConfig = {
 // Initialize base Firebase App
 const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
+/**
+ * Strict recursive cleaner to eliminate undefined and NaN values before writing to Firestore.
+ */
+export function deepCleanUndefined<T>(value: T): T {
+  if (value === undefined) return null as unknown as T;
+  if (typeof value === 'number' && Number.isNaN(value)) return 0 as unknown as T;
+  if (Array.isArray(value)) {
+    return value.map((item) => deepCleanUndefined(item)) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+    // Preserve Firestore FieldValues (e.g. serverTimestamp) and non-plain class instances
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== null && proto !== Object.prototype) {
+      return value;
+    }
+    const cleaned: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      cleaned[k] = v === undefined ? null : deepCleanUndefined(v);
+    }
+    return cleaned as T;
+  }
+  return value;
+}
+
 let db: Firestore;
 try {
   db = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
     }),
+    ignoreUndefinedProperties: true,
   });
 } catch {
   db = getFirestore(app);
@@ -220,35 +245,38 @@ export async function getDocs(queryOrColRef: any): Promise<any> {
 }
 
 export async function addDoc(colRef: any, data: any): Promise<any> {
+  const cleanedData = deepCleanUndefined(data);
   if (isMockMode) {
     const colName = colRef.collectionName;
-    const inserted = mockStore.insertDocument(colName, data);
+    const inserted = mockStore.insertDocument(colName, cleanedData);
     return {
       id: inserted.id,
       path: `${colName}/${inserted.id}`,
     };
   }
-  return fbAddDoc(colRef, data);
+  return fbAddDoc(colRef, cleanedData);
 }
 
 export async function setDoc(docRef: any, data: any, options?: any): Promise<void> {
+  const cleanedData = deepCleanUndefined(data);
   if (isMockMode) {
     const colName = docRef.collectionName;
     const docId = docRef.id || `${colName}_${Date.now()}`;
-    mockStore.upsertDocument(colName, docId, data);
+    mockStore.upsertDocument(colName, docId, cleanedData);
     return;
   }
-  return fbSetDoc(docRef, data, options);
+  return fbSetDoc(docRef, cleanedData, options);
 }
 
 export async function updateDoc(docRef: any, data: any): Promise<void> {
+  const cleanedData = deepCleanUndefined(data);
   if (isMockMode) {
     const colName = docRef.collectionName;
     const docId = docRef.id;
-    mockStore.upsertDocument(colName, docId, data);
+    mockStore.upsertDocument(colName, docId, cleanedData);
     return;
   }
-  return fbUpdateDoc(docRef, data);
+  return fbUpdateDoc(docRef, cleanedData);
 }
 
 export async function deleteDoc(docRef: any): Promise<void> {

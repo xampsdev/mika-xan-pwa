@@ -12,6 +12,7 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
+  deepCleanUndefined,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
@@ -36,13 +37,16 @@ import {
   Download,
   Radio,
   Trash2,
+  Calculator,
 } from 'lucide-react';
 import type { Pet, Tutor, Stay } from '@/types/schema';
 import { PetDetailModal } from '@/components/PetDetailModal';
 import { NotificationManager } from '@/components/NotificationManager';
+import { PricingCalculatorModal } from '@/components/PricingCalculatorModal';
 import { downloadGeneratedIcons } from '@/lib/pwaIconGenerator';
 import { sendNtfyAlert } from '@/lib/ntfy';
 import { cascadeDeletePet } from '@/utils/petDeletion';
+import { formatBRL } from '@/lib/pricingCalculator';
 
 // Exclusive Administrator Account (Xan)
 export const ALLOWED_ADMIN_EMAIL = 'xampsbeatz@gmail.com';
@@ -142,6 +146,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Change Password Modal State (Admin panel settings only)
   const [showChangePasswordModal, setShowChangePasswordModal] = useState<boolean>(false);
+  const [showPricingCalcModal, setShowPricingCalcModal] = useState<boolean>(false);
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [changePasswordFeedback, setChangePasswordFeedback] = useState<string | null>(null);
@@ -465,10 +470,13 @@ export const AdminDashboard: React.FC = () => {
 
   const handleApproveStay = async (stayId: string) => {
     try {
-      await updateDoc(doc(db, 'stays', stayId), {
-        status: 'active',
-        updatedAt: serverTimestamp(),
-      });
+      await updateDoc(
+        doc(db, 'stays', stayId),
+        deepCleanUndefined({
+          status: 'active',
+          updatedAt: serverTimestamp(),
+        })
+      );
       playNotificationChime();
       setDeleteToast({
         type: 'success',
@@ -679,6 +687,12 @@ export const AdminDashboard: React.FC = () => {
           });
           setTimeout(() => setDeleteToast(null), 5000);
         }}
+      />
+
+      {/* Standalone 24h Pricing Calculator Modal */}
+      <PricingCalculatorModal
+        isOpen={showPricingCalcModal}
+        onClose={() => setShowPricingCalcModal(false)}
       />
 
       {/* Delete Confirmation Modal */}
@@ -900,6 +914,16 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={() => setShowPricingCalcModal(true)}
+            className="min-h-[38px] inline-flex items-center gap-1.5 px-3 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] border border-[#7b93c2] text-[#1E293B] text-xs font-bold transition cursor-pointer shadow-xs"
+            title="Calculadora 24h e gerador de orçamentos para WhatsApp"
+          >
+            <Calculator className="w-3.5 h-3.5 text-[#1E293B]" />
+            <span className="hidden sm:inline">Orçamento 24h</span>
+            <span className="sm:hidden">Orçamento</span>
+          </button>
+
           <button
             onClick={async () => {
               setTestingHeaderNtfy(true);
@@ -1164,14 +1188,21 @@ export const AdminDashboard: React.FC = () => {
                       </p>
                     )}
                     {latestStay && (
-                      <p className="truncate">
-                        🗓️ {isActive ? 'Saída prevista' : 'Check-in'}:{' '}
-                        <strong className="text-[#1E293B]">
-                          {new Date(
-                            isActive ? latestStay.checkOutDate : latestStay.checkInDate
-                          ).toLocaleDateString('pt-BR')}
-                        </strong>
-                      </p>
+                      <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+                        <p className="truncate">
+                          🗓️ {isActive ? 'Saída prevista' : 'Check-in'}:{' '}
+                          <strong className="text-[#1E293B]">
+                            {new Date(
+                              isActive ? latestStay.checkOutDate : latestStay.checkInDate
+                            ).toLocaleDateString('pt-BR')}
+                          </strong>
+                        </p>
+                        {(latestStay.finalTotal !== undefined || latestStay.estimatedTotal !== undefined) && (
+                          <span className="text-[10px] font-black text-[#1E293B] bg-[#92a8d1]/30 border border-[#dec2cb] px-2 py-0.5 rounded-md shrink-0 ml-1">
+                            {formatBRL(latestStay.finalTotal ?? latestStay.estimatedTotal ?? 0)}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

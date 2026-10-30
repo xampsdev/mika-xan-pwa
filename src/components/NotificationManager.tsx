@@ -17,7 +17,7 @@ import {
   Send,
 } from 'lucide-react';
 import { getToken } from 'firebase/messaging';
-import { db, doc, setDoc, serverTimestamp, getMessagingInstance, isMockMode } from '@/lib/firebase';
+import { db, doc, setDoc, serverTimestamp, getMessagingInstance, isMockMode, deepCleanUndefined } from '@/lib/firebase';
 import { playNotificationChime } from '@/pages/AdminDashboard';
 import { sendNtfyAlert, NTFY_TOPIC, NTFY_WEB_URL } from '@/lib/ntfy';
 
@@ -128,15 +128,15 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({ adminE
       const tokenDocRef = doc(db, 'admin_tokens', token);
       await setDoc(
         tokenDocRef,
-        {
+        deepCleanUndefined({
           token,
           adminEmail: adminEmail || 'admin',
           deviceType: isIOS ? 'ios_safari_pwa' : 'android_or_desktop',
-          userAgent: navigator.userAgent,
+          userAgent: navigator.userAgent || '',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           active: true,
-        },
+        }),
         { merge: true }
       );
 

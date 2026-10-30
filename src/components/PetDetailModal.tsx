@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   db,
   collection,
@@ -15,6 +15,7 @@ import {
   updateDoc,
   addDoc,
   serverTimestamp,
+  deepCleanUndefined,
 } from '@/lib/firebase';
 import {
   X,
@@ -33,9 +34,14 @@ import {
   FileText,
   Lock,
   Save,
+  Calculator,
+  DollarSign,
+  Edit3,
+  Check,
 } from 'lucide-react';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
 import { cascadeDeletePet } from '@/utils/petDeletion';
+import { calculateStayPricing, formatBRL } from '@/lib/pricingCalculator';
 import type { Pet, Tutor, Stay, StayStatus } from '@/types/schema';
 
 interface PetDetailModalProps {
@@ -88,6 +94,20 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
   );
   const [newStayNotes, setNewStayNotes] = useState<string>('');
   const [submittingStay, setSubmittingStay] = useState<boolean>(false);
+
+  // Price Adjustment State per stay
+  const [editingPriceStayId, setEditingPriceStayId] = useState<string | null>(null);
+  const [adjustedPriceInput, setAdjustedPriceInput] = useState<string>('');
+  const [adjustedReasonInput, setAdjustedReasonInput] = useState<string>('');
+  const [savingPriceStayId, setSavingPriceStayId] = useState<string | null>(null);
+
+  // Live Pricing for New Stay form inside modal
+  const newStayPricing = useMemo(() => {
+    if (!newStayCheckIn || !newStayCheckOut) return null;
+    const [inDate, inTime] = newStayCheckIn.split('T');
+    const [outDate, outTime] = newStayCheckOut.split('T');
+    return calculateStayPricing(inDate, inTime, outDate, outTime);
+  }, [newStayCheckIn, newStayCheckOut]);
 
   useEffect(() => {
     if (pet) {
@@ -174,11 +194,11 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     try {
       await setDoc(
         doc(db, 'pet_admin_notes', pet.id),
-        {
+        deepCleanUndefined({
           petId: pet.id,
-          internalNotes: adminNotes,
+          internalNotes: adminNotes || '',
           updatedAt: serverTimestamp(),
-        },
+        }),
         { merge: true }
       );
       setAdminNotesFeedback('Observação salva com sucesso!');
@@ -196,10 +216,13 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
   const handleSaveStayAdminNotes = async (stayId: string, notes: string) => {
     setSavingStayNoteId(stayId);
     try {
-      await updateDoc(doc(db, 'stays', stayId), {
-        adminStayNotes: notes,
-        updatedAt: serverTimestamp(),
-      });
+      await updateDoc(
+        doc(db, 'stays', stayId),
+        deepCleanUndefined({
+          adminStayNotes: notes || '',
+          updatedAt: serverTimestamp(),
+        })
+      );
     } catch (err: any) {
       console.error('Failed to update stay admin notes:', err);
       alert('Erro ao salvar anotação desta estadia: ' + (err?.message || 'Erro desconhecido'));
@@ -217,10 +240,13 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     try {
       const dataUrl = await compressImageToDataUrl(file, 600, 0.7);
 
-      await updateDoc(doc(db, 'pets', pet.id), {
-        photoUrl: dataUrl,
-        updatedAt: serverTimestamp(),
-      });
+      await updateDoc(
+        doc(db, 'pets', pet.id),
+        deepCleanUndefined({
+          photoUrl: dataUrl || '',
+          updatedAt: serverTimestamp(),
+        })
+      );
 
       setCurrentPhotoUrl(dataUrl);
       if (onPetUpdated) {
@@ -266,10 +292,37 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
       if (newStatus === 'completed') {
         updates.actualCheckOutDate = new Date().toISOString();
       }
-      await updateDoc(doc(db, 'stays', stayId), updates);
+      await updateDoc(doc(db, 'stays', stayId), deepCleanUndefined(updates));
     } catch (err) {
       console.error('Error updating stay status:', err);
       alert('Erro ao atualizar status da estadia.');
+    }
+  };
+
+
+  // Handle saving customized price for a stay
+  const handleSavePriceAdjustment = async (stayId: string) => {
+    const num = parseFloat(adjustedPriceInput.replace(',', '.'));
+    if (isNaN(num) || num < 0) {
+      alert('Por favor informe um valor válido em R$.');
+      return;
+    }
+    setSavingPriceStayId(stayId);
+    try {
+      await updateDoc(
+        doc(db, 'stays', stayId),
+        deepCleanUndefined({
+          finalTotal: num,
+          adminPricingAdjustmentReason: (adjustedReasonInput || '').trim(),
+          updatedAt: serverTimestamp(),
+        })
+      );
+      setEditingPriceStayId(null);
+    } catch (err: any) {
+      console.error('Failed to update stay price:', err);
+      alert('Erro ao atualizar valor da estadia: ' + (err?.message || 'Erro'));
+    } finally {
+      setSavingPriceStayId(null);
     }
   };
 
@@ -280,17 +333,25 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
 
     setSubmittingStay(true);
     try {
-      const newStayData = {
+      const [inDate, inTime] = newStayCheckIn.split('T');
+      const [outDate, outTime] = newStayCheckOut.split('T');
+      const pricing = calculateStayPricing(inDate, inTime, outDate, outTime);
+
+      const newStayData: Omit<Stay, 'id'> = deepCleanUndefined({
         petId: pet.id,
         tutorId: pet.tutorId,
         checkInDate: newStayCheckIn,
         checkOutDate: newStayCheckOut,
         status: 'active' as StayStatus,
-        specialStayNotes: newStayNotes.trim(),
+        specialStayNotes: (newStayNotes || '').trim(),
+        estimatedTotal: pricing?.estimatedTotal ?? 0,
+        finalTotal: pricing?.estimatedTotal ?? 0,
+        totalHours: pricing?.totalHours ?? 0,
+        ...(pricing ? { pricingBreakdown: deepCleanUndefined(pricing) } : {}),
         createdAt: serverTimestamp(),
-      };
+      });
 
-      await addDoc(collection(db, 'stays'), newStayData);
+      await addDoc(collection(db, 'stays'), deepCleanUndefined(newStayData));
       setShowNewStayForm(false);
       setNewStayNotes('');
     } catch (err) {
@@ -920,6 +981,22 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                     />
                   </div>
 
+                  {newStayPricing && (
+                    <div className="p-3 rounded-xl bg-white border border-[#dec2cb] flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-[#1E293B] block">
+                          Estimativa: {newStayPricing.totalHours}h ({newStayPricing.summaryText})
+                        </span>
+                        <span className="text-[10px] text-[#64748B]">
+                          Seg-Qui: R$ 79 | Sex-Dom/Feriado: R$ 89 | Meia diária extra
+                        </span>
+                      </div>
+                      <span className="text-base font-black text-[#1E293B]">
+                        {formatBRL(newStayPricing.estimatedTotal)}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-end gap-2 pt-1">
                     <button
                       type="button"
@@ -1033,6 +1110,189 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                             )}
                           </div>
                         </div>
+
+                        {/* 24h Cycle Dynamic Pricing & Admin Adjustment */}
+                        {(() => {
+                          const stayPricing = stay.pricingBreakdown || (() => {
+                            if (stay.checkInDate && stay.checkOutDate) {
+                              const inParts = stay.checkInDate.includes('T') ? stay.checkInDate.split('T') : [stay.checkInDate, '10:00'];
+                              const outParts = stay.checkOutDate.includes('T') ? stay.checkOutDate.split('T') : [stay.checkOutDate, '10:00'];
+                              return calculateStayPricing(inParts[0], inParts[1].slice(0, 5), outParts[0], outParts[1].slice(0, 5));
+                            }
+                            return null;
+                          })();
+
+                          const isAdjustingThisPrice = editingPriceStayId === stay.id;
+                          const finalOrEstTotal = stay.finalTotal ?? stay.estimatedTotal ?? stayPricing?.estimatedTotal ?? 0;
+                          const hasAdjustment =
+                            stay.finalTotal !== undefined &&
+                            stay.estimatedTotal !== undefined &&
+                            stay.finalTotal !== stay.estimatedTotal;
+
+                          return (
+                            <div className="mt-1 pt-2 border-t border-[#dec2cb]/60 space-y-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-2.5 rounded-xl border border-[#dec2cb]/60 text-xs">
+                                <div className="flex items-center gap-2">
+                                  <Calculator className="w-4 h-4 text-[#2D3E5E]" />
+                                  <div>
+                                    <span className="font-black text-[#1E293B]">
+                                      {formatBRL(finalOrEstTotal)}
+                                    </span>
+                                    {hasAdjustment && (
+                                      <span className="text-[10px] text-[#64748B] ml-1.5 line-through">
+                                        {formatBRL(stay.estimatedTotal!)}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-[#64748B] ml-1.5 font-medium">
+                                      ({stay.totalHours || stayPricing?.totalHours || 24}h • {stayPricing?.summaryText || 'Ciclos 24h'})
+                                    </span>
+                                    {stay.adminPricingAdjustmentReason && (
+                                      <span className="text-[10px] text-[#2D3E5E] font-medium ml-1.5 bg-[#FAF8F9] px-1.5 py-0.5 rounded border border-[#dec2cb]">
+                                        Nota: {stay.adminPricingAdjustmentReason}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isAdjustingThisPrice) {
+                                      setEditingPriceStayId(null);
+                                    } else {
+                                      setEditingPriceStayId(stay.id);
+                                      setAdjustedPriceInput(String(finalOrEstTotal));
+                                      setAdjustedReasonInput(stay.adminPricingAdjustmentReason || '');
+                                    }
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-[#FAF8F9] hover:bg-[#c5b9cd]/30 border border-[#dec2cb] text-[11px] font-bold text-[#1E293B] flex items-center gap-1 transition cursor-pointer"
+                                >
+                                  <Edit3 className="w-3 h-3 text-[#2D3E5E]" />
+                                  <span>{isAdjustingThisPrice ? 'Fechar Ajuste' : 'Ajustar Valor'}</span>
+                                </button>
+                              </div>
+
+                              {/* Inline Adjustment Editor & Cycles Breakdown */}
+                              {isAdjustingThisPrice && (
+                                <div className="p-3 bg-[#FAF8F9] rounded-xl border border-[#dec2cb] space-y-2.5 text-xs animate-in fade-in">
+                                  {stayPricing && (
+                                    <div className="space-y-1">
+                                      <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
+                                        Detalhamento dos Ciclos de 24h:
+                                      </span>
+                                      {stayPricing.cyclesBreakdown.map((cycle, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-white border border-[#dec2cb]/40 text-[11px]"
+                                        >
+                                          <div className="flex items-center gap-1.5 truncate pr-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-[#92a8d1] shrink-0" />
+                                            <span className="text-[#1E293B] truncate">{cycle.description}</span>
+                                          </div>
+                                          <span className="font-bold text-[#1E293B] shrink-0 font-mono">
+                                            {cycle.rate === 0 ? 'Cortesia' : formatBRL(cycle.rate)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#1E293B] mb-0.5">
+                                        Valor Final em R$
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={adjustedPriceInput}
+                                        onChange={(e) => setAdjustedPriceInput(e.target.value)}
+                                        placeholder="Ex: 120.00"
+                                        className="w-full min-h-[38px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] rounded-lg px-3 py-1.5 text-xs font-mono text-[#1E293B]"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-[#1E293B] mb-0.5">
+                                        Motivo do Ajuste (Opcional)
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={adjustedReasonInput}
+                                        onChange={(e) => setAdjustedReasonInput(e.target.value)}
+                                        placeholder="Ex: Desconto fidelidade, cortesia saída"
+                                        className="w-full min-h-[38px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] rounded-lg px-3 py-1.5 text-xs text-[#1E293B]"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Quick Presets */}
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[10px] text-[#64748B] font-bold">Atalhos:</span>
+                                    {stayPricing && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setAdjustedPriceInput(String(stayPricing.estimatedTotal))}
+                                        className="px-2 py-0.5 rounded bg-white border border-[#dec2cb] hover:bg-[#FAF8F9] text-[10px] font-semibold text-[#1E293B]"
+                                      >
+                                        Tabela ({formatBRL(stayPricing.estimatedTotal)})
+                                      </button>
+                                    )}
+                                    {stayPricing && stayPricing.extraHours > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const baseCyclesTotal = stayPricing.cyclesBreakdown
+                                            .filter((c) => c.type === 'full_cycle' || c.type === 'same_day_minimum')
+                                            .reduce((acc, c) => acc + c.rate, 0);
+                                          setAdjustedPriceInput(String(baseCyclesTotal));
+                                          setAdjustedReasonInput('Cortesia horas extras na saída');
+                                        }}
+                                        className="px-2 py-0.5 rounded bg-white border border-[#dec2cb] hover:bg-[#FAF8F9] text-[10px] font-semibold text-[#1E293B]"
+                                      >
+                                        Cortesia Horas Extras
+                                      </button>
+                                    )}
+                                    {stayPricing && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const disc = Math.round(stayPricing.estimatedTotal * 0.9 * 100) / 100;
+                                          setAdjustedPriceInput(String(disc));
+                                          setAdjustedReasonInput('Desconto 10%');
+                                        }}
+                                        className="px-2 py-0.5 rounded bg-white border border-[#dec2cb] hover:bg-[#FAF8F9] text-[10px] font-semibold text-[#1E293B]"
+                                      >
+                                        -10% Desconto
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <div className="flex justify-end gap-2 pt-1 border-t border-[#dec2cb]/40">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingPriceStayId(null)}
+                                      className="px-3 py-1.5 rounded-lg border border-[#c5b9cd] bg-white text-[#1E293B] text-xs font-bold"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={savingPriceStayId === stay.id}
+                                      onClick={() => handleSavePriceAdjustment(stay.id)}
+                                      className="px-3.5 py-1.5 rounded-lg bg-[#2D3E5E] hover:bg-[#1E293B] text-white text-xs font-bold flex items-center gap-1 shadow-sm"
+                                    >
+                                      {savingPriceStayId === stay.id ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="w-3.5 h-3.5 text-[#92a8d1]" />
+                                      )}
+                                      <span>Salvar Valor da Estadia</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Anotações desta Hospedagem (Stay.adminStayNotes) - Unlocked for Approved Stays */}
                         {(isActive || isCompleted) && (
