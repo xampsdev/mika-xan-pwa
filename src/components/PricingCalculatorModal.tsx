@@ -314,7 +314,8 @@ export const PricingCalculatorModal: React.FC<PricingCalculatorModalProps> = ({
               Regras do Motor de Diárias:
             </p>
             <p>• <strong>Segunda a Quinta:</strong> R$ 79,00 (Meia = R$ 39,50)</p>
-            <p>• <strong>Sexta, Sábado, Domingo ou Feriados:</strong> R$ 89,00 (Meia = R$ 44,50)</p>
+            <p>• <strong>Sexta a Domingo:</strong> R$ 89,00 (Meia = R$ 44,50)</p>
+            <p>• <strong>Feriados e Alta Temporada (24/12, 25/12, 31/12, 01/01):</strong> R$ 120,00 (Meia = R$ 60,00)</p>
             <p>• <strong>Horas Extras na Saída:</strong> Até 30min cortesia | Até 6h = +meia diária | Mais de 6h = +1 diária inteira</p>
           </div>
         </div>

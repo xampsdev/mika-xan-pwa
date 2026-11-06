@@ -1269,7 +1269,7 @@ export const ClientCheckIn: React.FC = () => {
                                 Valor Total Estimado
                               </span>
                               <span className="text-[10px] text-[#64748B]">
-                                Seg-Qui: R$ 79 • Sex-Dom/Feriado: R$ 89
+                                Seg-Qui: R$ 79 • Sex-Dom: R$ 89 • Feriados/Alta: R$ 120
                               </span>
                             </div>
                             <div className="text-right">

@@ -7,8 +7,25 @@ import type { PricingCycleBreakdown, StayPricingCalculation } from '@/types/sche
 
 export const RATE_WEEKDAY_FULL = 79.0;
 export const RATE_WEEKDAY_HALF = 39.5;
-export const RATE_WEEKEND_HOLIDAY_FULL = 89.0;
-export const RATE_WEEKEND_HOLIDAY_HALF = 44.5;
+export const RATE_WEEKEND_FULL = 89.0;
+export const RATE_WEEKEND_HALF = 44.5;
+export const RATE_HOLIDAY_PEAK_FULL = 120.0;
+export const RATE_HOLIDAY_PEAK_HALF = 60.0;
+
+// Legacy alias preservation for backward compatibility
+export const RATE_WEEKEND_HOLIDAY_FULL = RATE_WEEKEND_FULL;
+export const RATE_WEEKEND_HOLIDAY_HALF = RATE_WEEKEND_HALF;
+
+/**
+ * High-Season Peak Date Overrides (MM-DD keys).
+ * Christmas Eve, Christmas, New Year's Eve, New Year's Day.
+ */
+export const PEAK_HIGH_SEASON_DATES: Record<string, string> = {
+  '12-24': 'Véspera de Natal (Alta Temporada)',
+  '12-25': 'Natal (Alta Temporada)',
+  '12-31': 'Véspera de Ano Novo (Alta Temporada)',
+  '01-01': 'Ano Novo / Confraternização Universal (Alta Temporada)',
+};
 
 /**
  * Fixed National (Brazil) and São Paulo (State/City) Holidays.
@@ -79,32 +96,56 @@ export function getMovableHolidaysForYear(year: number): Map<string, string> {
 }
 
 /**
- * Checks whether a given Date is a recognized Brazil/SP Holiday.
+ * Checks whether a given Date is a recognized Brazil/SP Holiday or Peak Date.
  */
-export function getHolidayInfo(date: Date): { isHoliday: boolean; holidayName?: string } {
+export function getHolidayInfo(date: Date): { isHoliday: boolean; isPeakDate?: boolean; holidayName?: string } {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   const key = `${mm}-${dd}`;
 
-  if (FIXED_HOLIDAYS_SP[key]) {
-    return { isHoliday: true, holidayName: FIXED_HOLIDAYS_SP[key] };
+  // Check explicit peak dates first (12-24, 12-25, 12-31, 01-01)
+  if (PEAK_HIGH_SEASON_DATES[key]) {
+    return {
+      isHoliday: true,
+      isPeakDate: true,
+      holidayName: PEAK_HIGH_SEASON_DATES[key],
+    };
   }
 
+  // Check fixed holidays
+  if (FIXED_HOLIDAYS_SP[key]) {
+    return {
+      isHoliday: true,
+      isPeakDate: true,
+      holidayName: FIXED_HOLIDAYS_SP[key],
+    };
+  }
+
+  // Check movable holidays (Easter-based)
   const movableMap = getMovableHolidaysForYear(date.getFullYear());
   if (movableMap.has(key)) {
-    return { isHoliday: true, holidayName: movableMap.get(key) };
+    return {
+      isHoliday: true,
+      isPeakDate: true,
+      holidayName: movableMap.get(key),
+    };
   }
 
-  return { isHoliday: false };
+  return { isHoliday: false, isPeakDate: false };
 }
 
 /**
- * Determines whether a date qualifies as Weekend (Friday, Saturday, Sunday) or Holiday.
+ * Determines pricing tier and daily rates for a specific calendar date:
+ * - Holidays & Peak Dates (National, SP, Mobile, Dec 24/25/31, Jan 01): R$ 120,00 (Full) / R$ 60,00 (Half)
+ * - Weekend (Fri, Sat, Sun non-holiday): R$ 89,00 (Full) / R$ 44,50 (Half)
+ * - Weekday (Mon–Thu non-holiday): R$ 79,00 (Full) / R$ 39,50 (Half)
  * Day of week: 0 = Sunday, 5 = Friday, 6 = Saturday.
  */
 export function evaluateDateRate(date: Date): {
   isWeekendOrHoliday: boolean;
   isWeekend: boolean;
+  isHoliday: boolean;
+  isPeakDate: boolean;
   holidayName?: string | null;
   dayOfWeek: number;
   fullRate: number;
@@ -114,10 +155,20 @@ export function evaluateDateRate(date: Date): {
   const dayOfWeek = date.getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Sun, Fri, Sat
   const holiday = getHolidayInfo(date);
-  const isWeekendOrHoliday = isWeekend || holiday.isHoliday;
+  const isHoliday = Boolean(holiday.isHoliday);
+  const isPeakDate = Boolean(holiday.isPeakDate || isHoliday);
+  const isWeekendOrHoliday = isWeekend || isHoliday;
 
-  const fullRate = isWeekendOrHoliday ? RATE_WEEKEND_HOLIDAY_FULL : RATE_WEEKDAY_FULL;
-  const halfRate = isWeekendOrHoliday ? RATE_WEEKEND_HOLIDAY_HALF : RATE_WEEKDAY_HALF;
+  let fullRate = RATE_WEEKDAY_FULL;
+  let halfRate = RATE_WEEKDAY_HALF;
+
+  if (isHoliday || isPeakDate) {
+    fullRate = RATE_HOLIDAY_PEAK_FULL;
+    halfRate = RATE_HOLIDAY_PEAK_HALF;
+  } else if (isWeekend) {
+    fullRate = RATE_WEEKEND_FULL;
+    halfRate = RATE_WEEKEND_HALF;
+  }
 
   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const dayLabel = `${dayNames[dayOfWeek]}, ${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -125,6 +176,8 @@ export function evaluateDateRate(date: Date): {
   return {
     isWeekendOrHoliday,
     isWeekend,
+    isHoliday,
+    isPeakDate,
     holidayName: holiday.holidayName || null,
     dayOfWeek,
     fullRate,
@@ -148,16 +201,20 @@ export function formatBRL(amount: number): string {
 /**
  * 24-Hour Cycle + Half-Day Dynamic Pricing Engine.
  *
+ * Revised Rate Structure:
+ * 1. Weekday (Mon–Thu): R$ 79,00 (Full 24h) | R$ 39,50 (Half-day: 31m to 6h extra)
+ * 2. Weekend (Fri–Sun): R$ 89,00 (Full 24h) | R$ 44,50 (Half-day: 31m to 6h extra)
+ * 3. Holidays & Peak Dates (National/SP/Mobile + Dec 24, Dec 25, Dec 31, Jan 01):
+ *    R$ 120,00 (Full 24h) | R$ 60,00 (Half-day: 31m to 6h extra)
+ *
  * Rules:
  * 1. Base 24-hour cycle calculated from combined check-in to check-out.
- * 2. If duration <= 24h: Minimum 1 full daily rate based on check-in day.
+ * 2. If duration <= 24h: Minimum 1 full daily rate based on check-in day tier.
  * 3. Each full 24h block takes the daily rate corresponding to its calendar cycle start date.
- *    - Mon-Thu non-holiday: R$ 79,00
- *    - Fri, Sat, Sun OR Holiday: R$ 89,00
  * 4. Overtime hours (extraHours):
  *    - <= 0.5 hours (30 mins): Tolerance courtesy (R$ 0,00)
- *    - > 0.5 hours to <= 6.0 hours: +0.5 diária (Meia Diária: R$ 39,50 or R$ 44,50 based on checkout day)
- *    - > 6.0 hours: +1.0 full diária (R$ 79,00 or R$ 89,00 based on checkout day)
+ *    - > 0.5 hours to <= 6.0 hours: +0.5 diária (Meia Diária: R$ 39,50, R$ 44,50 or R$ 60,00 based on checkout day tier)
+ *    - > 6.0 hours: +1.0 full diária (R$ 79,00, R$ 89,00 or R$ 120,00 based on checkout day tier)
  */
 export function calculateStayPricing(
   checkInDate: string,
@@ -193,7 +250,7 @@ export function calculateStayPricing(
     totalAmount += rateInfo.fullRate;
 
     const desc = rateInfo.holidayName
-      ? `1 Diária Mínima (${rateInfo.dayLabel} - Feriado: ${rateInfo.holidayName})`
+      ? `1 Diária Mínima (${rateInfo.dayLabel} - ${rateInfo.holidayName})`
       : rateInfo.isWeekend
         ? `1 Diária Mínima (${rateInfo.dayLabel} - Final de Semana)`
         : `1 Diária Mínima (${rateInfo.dayLabel} - Dia Útil)`;
@@ -205,6 +262,8 @@ export function calculateStayPricing(
       dateKey: checkInDate,
       dayOfWeek: rateInfo.dayOfWeek,
       isWeekendOrHoliday: rateInfo.isWeekendOrHoliday,
+      isHoliday: rateInfo.isHoliday,
+      isPeakDate: rateInfo.isPeakDate,
       holidayName: rateInfo.holidayName,
       rate: rateInfo.fullRate,
       description: desc,
@@ -236,7 +295,7 @@ export function calculateStayPricing(
 
     const cycleNum = i + 1;
     const tag = rateInfo.holidayName
-      ? `Feriado: ${rateInfo.holidayName}`
+      ? rateInfo.holidayName
       : rateInfo.isWeekend
         ? 'Fim de Semana'
         : 'Seg a Qui';
@@ -248,6 +307,8 @@ export function calculateStayPricing(
       dateKey: cycleStartDate.toISOString().split('T')[0],
       dayOfWeek: rateInfo.dayOfWeek,
       isWeekendOrHoliday: rateInfo.isWeekendOrHoliday,
+      isHoliday: rateInfo.isHoliday,
+      isPeakDate: rateInfo.isPeakDate,
       holidayName: rateInfo.holidayName,
       rate: rateInfo.fullRate,
       description: `${cycleNum}º Ciclo 24h (${rateInfo.dayLabel} • ${tag})`,
@@ -269,6 +330,8 @@ export function calculateStayPricing(
         dateKey: checkOutDate,
         dayOfWeek: checkoutRateInfo.dayOfWeek,
         isWeekendOrHoliday: checkoutRateInfo.isWeekendOrHoliday,
+        isHoliday: checkoutRateInfo.isHoliday,
+        isPeakDate: checkoutRateInfo.isPeakDate,
         holidayName: checkoutRateInfo.holidayName,
         rate: 0,
         description: `Tolerância de Saída (+${extraHours}h até 30min • Cortesia R$ 0,00)`,
@@ -279,7 +342,7 @@ export function calculateStayPricing(
       overtimeType = 'half_day';
       totalAmount += checkoutRateInfo.halfRate;
       const tag = checkoutRateInfo.holidayName
-        ? `Feriado: ${checkoutRateInfo.holidayName}`
+        ? checkoutRateInfo.holidayName
         : checkoutRateInfo.isWeekend
           ? 'Fim de Semana'
           : 'Seg a Qui';
@@ -291,6 +354,8 @@ export function calculateStayPricing(
         dateKey: checkOutDate,
         dayOfWeek: checkoutRateInfo.dayOfWeek,
         isWeekendOrHoliday: checkoutRateInfo.isWeekendOrHoliday,
+        isHoliday: checkoutRateInfo.isHoliday,
+        isPeakDate: checkoutRateInfo.isPeakDate,
         holidayName: checkoutRateInfo.holidayName,
         rate: checkoutRateInfo.halfRate,
         description: `Meia Diária Adicional (+${extraHours}h até 6h • ${tag})`,
@@ -301,7 +366,7 @@ export function calculateStayPricing(
       overtimeType = 'full_day';
       totalAmount += checkoutRateInfo.fullRate;
       const tag = checkoutRateInfo.holidayName
-        ? `Feriado: ${checkoutRateInfo.holidayName}`
+        ? checkoutRateInfo.holidayName
         : checkoutRateInfo.isWeekend
           ? 'Fim de Semana'
           : 'Seg a Qui';
@@ -313,6 +378,8 @@ export function calculateStayPricing(
         dateKey: checkOutDate,
         dayOfWeek: checkoutRateInfo.dayOfWeek,
         isWeekendOrHoliday: checkoutRateInfo.isWeekendOrHoliday,
+        isHoliday: checkoutRateInfo.isHoliday,
+        isPeakDate: checkoutRateInfo.isPeakDate,
         holidayName: checkoutRateInfo.holidayName,
         rate: checkoutRateInfo.fullRate,
         description: `Diária Completa Adicional (+${extraHours}h > 6h • ${tag})`,

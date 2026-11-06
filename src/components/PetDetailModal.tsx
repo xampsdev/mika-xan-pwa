@@ -988,7 +988,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                           Estimativa: {newStayPricing.totalHours}h ({newStayPricing.summaryText})
                         </span>
                         <span className="text-[10px] text-[#64748B]">
-                          Seg-Qui: R$ 79 | Sex-Dom/Feriado: R$ 89 | Meia diária extra
+                          Seg-Qui: R$ 79 | Sex-Dom: R$ 89 | Feriados/Alta: R$ 120
                         </span>
                       </div>
                       <span className="text-base font-black text-[#1E293B]">

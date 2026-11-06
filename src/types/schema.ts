@@ -124,6 +124,8 @@ export interface PricingCycleBreakdown {
   dateKey: string;
   dayOfWeek: number;
   isWeekendOrHoliday: boolean;
+  isHoliday?: boolean;
+  isPeakDate?: boolean;
   holidayName?: string | null;
   rate: number;
   description: string;
