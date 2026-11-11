@@ -42,7 +42,7 @@ import {
   Paperclip,
   ZoomIn,
 } from 'lucide-react';
-import { compressImageToDataUrl } from '@/utils/imageCompression';
+import { compressImageToDataUrl, processVaccinationCardFile } from '@/utils/imageCompression';
 import { cascadeDeletePet } from '@/utils/petDeletion';
 import { calculateStayPricing, formatBRL } from '@/lib/pricingCalculator';
 import { ImageLightboxModal } from '@/components/ImageLightboxModal';
@@ -87,6 +87,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
   // Vaccination Card Upload State (Admin-Only)
   const [uploadingVaccinationCard, setUploadingVaccinationCard] = useState<boolean>(false);
   const [currentVaccinationCardUrl, setCurrentVaccinationCardUrl] = useState<string | null>(null);
+  const [vaccinationCardToast, setVaccinationCardToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Modal Lightbox State
   const [lightboxData, setLightboxData] = useState<{
@@ -281,33 +282,55 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     }
   };
 
-  // Handle Vaccination Card Upload (WebP compressed DataURL < 100KB to Firestore)
+  // Handle Vaccination Card Upload (Image or PDF client-side rendering & WebP compression)
   const handleVaccinationCardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingVaccinationCard(true);
+    setVaccinationCardToast(null);
+
     try {
-      // Compress with high quality 800px width in WebP format for crisp text & stamp readability
-      const dataUrl = await compressImageToDataUrl(file, 800, 0.72, 'image/webp');
+      const result = await processVaccinationCardFile(file);
 
       await updateDoc(
         doc(db, 'pets', pet.id),
         deepCleanUndefined({
-          vaccinationCardUrl: dataUrl,
+          vaccinationCardUrl: result.dataUrl,
           updatedAt: serverTimestamp(),
         })
       );
 
-      setCurrentVaccinationCardUrl(dataUrl);
+      setCurrentVaccinationCardUrl(result.dataUrl);
       if (onPetUpdated) {
-        onPetUpdated({ ...pet, vaccinationCardUrl: dataUrl });
+        onPetUpdated({ ...pet, vaccinationCardUrl: result.dataUrl });
       }
-    } catch (err) {
+
+      if (result.message) {
+        setVaccinationCardToast({
+          message: result.message,
+          type: 'info',
+        });
+        setTimeout(() => setVaccinationCardToast(null), 6000);
+      } else {
+        setVaccinationCardToast({
+          message: result.isPdf ? 'PDF convertido e salvo com sucesso!' : 'Comprovante salvo com sucesso!',
+          type: 'success',
+        });
+        setTimeout(() => setVaccinationCardToast(null), 4000);
+      }
+    } catch (err: unknown) {
       console.error('Failed to upload vaccination card:', err);
-      alert('Falha ao processar ou salvar o comprovante da carteirinha de vacinação.');
+      const errMsg = err instanceof Error ? err.message : 'Falha ao processar comprovante de vacinação.';
+      setVaccinationCardToast({
+        message: errMsg,
+        type: 'error',
+      });
+      alert(errMsg);
     } finally {
       setUploadingVaccinationCard(false);
+      // Reset input value so re-selecting same file triggers onChange
+      e.target.value = '';
     }
   };
 
@@ -777,7 +800,6 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     disabled={uploadingPhoto}
                     onChange={handlePhotoUpload}
                     className="hidden"
@@ -943,7 +965,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
 
                         <div className="flex items-center gap-1 shrink-0">
                           {/* Replace Card Button */}
-                          <label className="cursor-pointer min-h-[38px] min-w-[38px] p-2 rounded-xl bg-[#FAF8F9] hover:bg-[#F3EFF2] text-[#1E293B] border border-[#c5b9cd] flex items-center justify-center transition shadow-xs" title="Substituir Carteirinha">
+                          <label className="cursor-pointer min-h-[38px] min-w-[38px] p-2 rounded-xl bg-[#FAF8F9] hover:bg-[#F3EFF2] text-[#1E293B] border border-[#c5b9cd] flex items-center justify-center transition shadow-xs" title="Substituir Carteirinha (Foto ou PDF)">
                             {uploadingVaccinationCard ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2D3E5E]" />
                             ) : (
@@ -951,7 +973,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                             )}
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,application/pdf"
                               disabled={uploadingVaccinationCard}
                               onChange={handleVaccinationCardUpload}
                               className="hidden"
@@ -977,7 +999,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                             Nenhum comprovante anexado
                           </p>
                           <p className="text-[10px] text-[#64748B]">
-                            Fotografe ou anexe a carteirinha física de vacinação deste pet.
+                            Anexe foto ou PDF da carteirinha (conversão automática da pág. 1).
                           </p>
                         </div>
 
@@ -985,23 +1007,55 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                           {uploadingVaccinationCard ? (
                             <>
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1E293B]" />
-                              <span>Compactando...</span>
+                              <span>Processando...</span>
                             </>
                           ) : (
                             <>
                               <Paperclip className="w-3.5 h-3.5 text-[#1E293B]" />
-                              <span>Anexar Carteirinha</span>
+                              <span>Anexar Foto ou PDF</span>
                             </>
                           )}
                           <input
                             type="file"
-                            accept="image/*"
-                            capture="environment"
+                            accept="image/*,application/pdf"
                             disabled={uploadingVaccinationCard}
                             onChange={handleVaccinationCardUpload}
                             className="hidden"
                           />
                         </label>
+                      </div>
+                    )}
+
+                    {/* Inline Vaccination Card Processing Toast */}
+                    {vaccinationCardToast && (
+                      <div
+                        className={`p-2.5 rounded-xl text-xs flex items-center justify-between gap-2 animate-in fade-in ${
+                          vaccinationCardToast.type === 'success'
+                            ? 'bg-[#d2e3d8] border border-[#a3cbb1] text-[#133E26]'
+                            : vaccinationCardToast.type === 'info'
+                              ? 'bg-[#c5b9cd]/30 border border-[#92a8d1] text-[#1E293B]'
+                              : 'bg-[#f7cac9] border border-[#dec2cb] text-[#7F1D1D]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {vaccinationCardToast.type === 'success' ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#133E26] shrink-0" />
+                          ) : vaccinationCardToast.type === 'info' ? (
+                            <FileText className="w-3.5 h-3.5 text-[#2D3E5E] shrink-0" />
+                          ) : (
+                            <ShieldAlert className="w-3.5 h-3.5 text-[#7F1D1D] shrink-0" />
+                          )}
+                          <span className="font-semibold text-[11px] leading-tight">
+                            {vaccinationCardToast.message}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setVaccinationCardToast(null)}
+                          className="p-1 rounded-md hover:bg-black/5 text-[#64748B] shrink-0"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
                     )}
                   </div>
