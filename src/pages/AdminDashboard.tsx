@@ -38,11 +38,14 @@ import {
   Radio,
   Trash2,
   Calculator,
+  ZoomIn,
+  Eye,
 } from 'lucide-react';
 import type { Pet, Tutor, Stay } from '@/types/schema';
 import { PetDetailModal } from '@/components/PetDetailModal';
 import { NotificationManager } from '@/components/NotificationManager';
 import { PricingCalculatorModal } from '@/components/PricingCalculatorModal';
+import { ImageLightboxModal } from '@/components/ImageLightboxModal';
 import { downloadGeneratedIcons } from '@/lib/pwaIconGenerator';
 import { sendNtfyAlert } from '@/lib/ntfy';
 import { cascadeDeletePet } from '@/utils/petDeletion';
@@ -170,6 +173,18 @@ export const AdminDashboard: React.FC = () => {
   // Selected Pet for Detail Modal
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+
+  // Lightbox Modal State
+  const [lightboxData, setLightboxData] = useState<{
+    isOpen: boolean;
+    imageUrl: string | null;
+    title: string;
+    subtitle?: string;
+  }>({
+    isOpen: false,
+    imageUrl: null,
+    title: '',
+  });
 
   // Force clean sign-out whenever leaving AdminDashboard (on unmount)
   useEffect(() => {
@@ -695,6 +710,15 @@ export const AdminDashboard: React.FC = () => {
         onClose={() => setShowPricingCalcModal(false)}
       />
 
+      {/* Full-Screen Image Lightbox Modal */}
+      <ImageLightboxModal
+        isOpen={lightboxData.isOpen}
+        imageUrl={lightboxData.imageUrl}
+        title={lightboxData.title}
+        subtitle={lightboxData.subtitle}
+        onClose={() => setLightboxData((prev) => ({ ...prev, isOpen: false }))}
+      />
+
       {/* Delete Confirmation Modal */}
       {petToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
@@ -1114,11 +1138,29 @@ export const AdminDashboard: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
                     {pet.photoUrl ? (
-                      <img
-                        src={pet.photoUrl}
-                        alt={pet.nameAndBreed}
-                        className="w-14 h-14 rounded-2xl object-cover border border-[#dec2cb] shrink-0 shadow-sm"
-                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLightboxData({
+                            isOpen: true,
+                            imageUrl: pet.photoUrl,
+                            title: pet.nameAndBreed,
+                            subtitle: `Tutor: ${tutor?.fullName || 'Não informado'} • ${pet.ageAndWeight}`,
+                          });
+                        }}
+                        className="relative group w-14 h-14 rounded-2xl overflow-hidden border border-[#dec2cb] shrink-0 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#92a8d1]"
+                        title="Clique para ampliar a foto do pet"
+                      >
+                        <img
+                          src={pet.photoUrl}
+                          alt={pet.nameAndBreed}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                        />
+                        <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                          <ZoomIn className="w-4 h-4 text-white" />
+                        </div>
+                      </button>
                     ) : (
                       <div className="w-14 h-14 rounded-2xl bg-[#c5b9cd]/30 border border-[#dec2cb] text-[#1E293B] flex flex-col items-center justify-center shrink-0">
                         <Dog className="w-6 h-6" />

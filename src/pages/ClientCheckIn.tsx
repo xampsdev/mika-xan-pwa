@@ -33,11 +33,13 @@ import {
   Calculator,
   Receipt,
   Sparkles,
+  ZoomIn,
 } from 'lucide-react';
 import { formatBrazilianPhone, isValidBrazilianPhone } from '@/utils/phone';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
 import { sendNtfyAlert } from '@/lib/ntfy';
 import { calculateStayPricing, formatBRL } from '@/lib/pricingCalculator';
+import { ImageLightboxModal } from '@/components/ImageLightboxModal';
 import type { Tutor, Pet, Stay, StayStatus } from '@/types/schema';
 
 type FlowStage = 'phone_lookup' | 'returning_client' | 'intake_form' | 'success_confirmation';
@@ -140,6 +142,18 @@ export const ClientCheckIn: React.FC = () => {
     pet: Pet;
     stay: Stay;
   } | null>(null);
+
+  // Lightbox Modal State
+  const [lightboxData, setLightboxData] = useState<{
+    isOpen: boolean;
+    imageUrl: string | null;
+    title: string;
+    subtitle?: string;
+  }>({
+    isOpen: false,
+    imageUrl: null,
+    title: '',
+  });
 
   // Live 24-Hour Cycle + Half-Day Dynamic Pricing Quote
   const livePricingQuote = useMemo(() => {
@@ -558,11 +572,28 @@ export const ClientCheckIn: React.FC = () => {
                   >
                     <div className="flex items-center gap-3">
                       {pet.photoUrl ? (
-                        <img
-                          src={pet.photoUrl}
-                          alt={pet.nameAndBreed}
-                          className="w-14 h-14 rounded-2xl object-cover border border-[#dec2cb] shrink-0"
-                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setLightboxData({
+                              isOpen: true,
+                              imageUrl: pet.photoUrl,
+                              title: pet.nameAndBreed,
+                              subtitle: `Foto Cadastrada • ${pet.ageAndWeight}`,
+                            })
+                          }
+                          className="relative group w-14 h-14 rounded-2xl overflow-hidden border border-[#dec2cb] shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#92a8d1]"
+                          title="Ampliar foto do pet"
+                        >
+                          <img
+                            src={pet.photoUrl}
+                            alt={pet.nameAndBreed}
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                          />
+                          <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                            <ZoomIn className="w-4 h-4 text-white" />
+                          </div>
+                        </button>
                       ) : (
                         <div className="w-14 h-14 rounded-2xl bg-[#c5b9cd]/30 text-[#1E293B] border border-[#dec2cb] flex items-center justify-center shrink-0">
                           <Dog className="w-7 h-7" />
@@ -1507,6 +1538,15 @@ export const ClientCheckIn: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Full-Screen Image Lightbox Modal */}
+      <ImageLightboxModal
+        isOpen={lightboxData.isOpen}
+        imageUrl={lightboxData.imageUrl}
+        title={lightboxData.title}
+        subtitle={lightboxData.subtitle}
+        onClose={() => setLightboxData((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

@@ -18,7 +18,8 @@ export interface CompressionOptions {
 export async function compressImageToDataUrl(
   file: File,
   maxWidth = 600,
-  quality = 0.7
+  quality = 0.7,
+  mimeType = 'image/webp'
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -57,10 +58,20 @@ export async function compressImageToDataUrl(
         }
 
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'medium';
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let dataUrl = '';
+        try {
+          dataUrl = canvas.toDataURL(mimeType, quality);
+          // Fallback if browser does not support requested mimeType
+          if (!dataUrl || !dataUrl.startsWith(`data:${mimeType}`)) {
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+        } catch {
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+
         resolve(dataUrl);
       };
 

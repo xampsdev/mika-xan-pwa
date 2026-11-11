@@ -38,10 +38,14 @@ import {
   DollarSign,
   Edit3,
   Check,
+  Eye,
+  Paperclip,
+  ZoomIn,
 } from 'lucide-react';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
 import { cascadeDeletePet } from '@/utils/petDeletion';
 import { calculateStayPricing, formatBRL } from '@/lib/pricingCalculator';
+import { ImageLightboxModal } from '@/components/ImageLightboxModal';
 import type { Pet, Tutor, Stay, StayStatus } from '@/types/schema';
 
 interface PetDetailModalProps {
@@ -80,6 +84,22 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
   const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string>('');
 
+  // Vaccination Card Upload State (Admin-Only)
+  const [uploadingVaccinationCard, setUploadingVaccinationCard] = useState<boolean>(false);
+  const [currentVaccinationCardUrl, setCurrentVaccinationCardUrl] = useState<string | null>(null);
+
+  // Modal Lightbox State
+  const [lightboxData, setLightboxData] = useState<{
+    isOpen: boolean;
+    imageUrl: string | null;
+    title: string;
+    subtitle?: string;
+  }>({
+    isOpen: false,
+    imageUrl: null,
+    title: '',
+  });
+
   // Delete State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
@@ -112,6 +132,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
   useEffect(() => {
     if (pet) {
       setCurrentPhotoUrl(pet.photoUrl || '');
+      setCurrentVaccinationCardUrl(pet.vaccinationCardUrl || null);
     }
   }, [pet]);
 
@@ -260,6 +281,64 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     }
   };
 
+  // Handle Vaccination Card Upload (WebP compressed DataURL < 100KB to Firestore)
+  const handleVaccinationCardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingVaccinationCard(true);
+    try {
+      // Compress with high quality 800px width in WebP format for crisp text & stamp readability
+      const dataUrl = await compressImageToDataUrl(file, 800, 0.72, 'image/webp');
+
+      await updateDoc(
+        doc(db, 'pets', pet.id),
+        deepCleanUndefined({
+          vaccinationCardUrl: dataUrl,
+          updatedAt: serverTimestamp(),
+        })
+      );
+
+      setCurrentVaccinationCardUrl(dataUrl);
+      if (onPetUpdated) {
+        onPetUpdated({ ...pet, vaccinationCardUrl: dataUrl });
+      }
+    } catch (err) {
+      console.error('Failed to upload vaccination card:', err);
+      alert('Falha ao processar ou salvar o comprovante da carteirinha de vacinação.');
+    } finally {
+      setUploadingVaccinationCard(false);
+    }
+  };
+
+  // Handle removing vaccination card
+  const handleRemoveVaccinationCard = async () => {
+    if (!window.confirm('Deseja realmente remover o comprovante da carteirinha de vacinação deste pet?')) {
+      return;
+    }
+
+    setUploadingVaccinationCard(true);
+    try {
+      await updateDoc(
+        doc(db, 'pets', pet.id),
+        deepCleanUndefined({
+          vaccinationCardUrl: null,
+          updatedAt: serverTimestamp(),
+        })
+      );
+
+      setCurrentVaccinationCardUrl(null);
+      if (onPetUpdated) {
+        onPetUpdated({ ...pet, vaccinationCardUrl: null });
+      }
+    } catch (err) {
+      console.error('Failed to remove vaccination card:', err);
+      alert('Erro ao remover o comprovante.');
+    } finally {
+      setUploadingVaccinationCard(false);
+    }
+  };
+
   // Delete Pet and Cascade Stays + Admin Notes
   const handleDeletePet = async () => {
     if (!pet) return;
@@ -382,11 +461,28 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
         <div className="sticky top-0 z-20 border-b border-[#dec2cb]/60 p-4 sm:p-5 bg-white/95 backdrop-blur-md flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             {currentPhotoUrl ? (
-              <img
-                src={currentPhotoUrl}
-                alt={pet.nameAndBreed}
-                className="w-12 h-12 rounded-2xl object-cover border border-[#dec2cb] shadow-sm shrink-0"
-              />
+              <button
+                type="button"
+                onClick={() =>
+                  setLightboxData({
+                    isOpen: true,
+                    imageUrl: currentPhotoUrl,
+                    title: pet.nameAndBreed,
+                    subtitle: `Foto do Pet • Tutor: ${tutor?.fullName || 'Não informado'}`,
+                  })
+                }
+                className="relative group rounded-2xl overflow-hidden border border-[#dec2cb] shadow-sm shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#92a8d1]"
+                title="Ampliar foto do pet"
+              >
+                <img
+                  src={currentPhotoUrl}
+                  alt={pet.nameAndBreed}
+                  className="w-12 h-12 object-cover group-hover:scale-105 transition duration-200"
+                />
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                  <ZoomIn className="w-4 h-4 text-white" />
+                </div>
+              </button>
             ) : (
               <div className="w-12 h-12 rounded-2xl bg-[#c5b9cd]/30 text-[#1E293B] border border-[#dec2cb] flex items-center justify-center shrink-0">
                 <Dog className="w-6 h-6" />
@@ -628,11 +724,28 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
               <div className="p-4 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                   {currentPhotoUrl ? (
-                    <img
-                      src={currentPhotoUrl}
-                      alt={pet.nameAndBreed}
-                      className="w-16 h-16 rounded-2xl object-cover border-2 border-[#92a8d1] shadow-sm shrink-0"
-                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLightboxData({
+                          isOpen: true,
+                          imageUrl: currentPhotoUrl,
+                          title: pet.nameAndBreed,
+                          subtitle: `Foto Cadastrada (Campo 22) • Tutor: ${tutor?.fullName || 'Não informado'}`,
+                        })
+                      }
+                      className="relative group rounded-2xl overflow-hidden border-2 border-[#92a8d1] shadow-sm shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#92a8d1]"
+                      title="Clique para ampliar em alta resolução"
+                    >
+                      <img
+                        src={currentPhotoUrl}
+                        alt={pet.nameAndBreed}
+                        className="w-16 h-16 object-cover group-hover:scale-105 transition duration-200"
+                      />
+                      <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                        <ZoomIn className="w-5 h-5 text-white" />
+                      </div>
+                    </button>
                   ) : (
                     <div className="w-16 h-16 rounded-2xl bg-white border-2 border-dashed border-[#dec2cb] flex flex-col items-center justify-center text-[#64748B] shrink-0">
                       <Camera className="w-5 h-5 mb-0.5 text-[#2D3E5E]" />
@@ -644,7 +757,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                       {currentPhotoUrl ? 'Foto Cadastrada (Campo 22)' : 'Sem Foto Cadastrada'}
                     </span>
                     <p className="text-[11px] text-[#64748B] mt-0.5">
-                      Atualize ou tire uma foto com a câmera para reconhecimento rápido.
+                      {currentPhotoUrl ? 'Toque na imagem para ampliar em tela cheia com zoom ou substitua abaixo.' : 'Atualize ou tire uma foto com a câmera para reconhecimento rápido.'}
                     </p>
                   </div>
                 </div>
@@ -766,6 +879,131 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                         {pet.vaccinationUpToDate ? 'Em dia' : 'Pendente'}
                       </span>
                     </div>
+                  </div>
+
+                  {/* Feature: Vaccination Card Attachment (Admin-Only) */}
+                  <div className="pt-2 border-t border-[#dec2cb]/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-[#1E293B] uppercase font-bold flex items-center gap-1">
+                        <Paperclip className="w-3 h-3 text-[#2D3E5E]" />
+                        <span>Comprovante da Carteirinha (Admin)</span>
+                      </span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#c5b9cd]/30 text-[#1E293B] border border-[#dec2cb]">
+                        Exclusivo Anfitriões
+                      </span>
+                    </div>
+
+                    {currentVaccinationCardUrl ? (
+                      <div className="p-2.5 rounded-xl bg-white border border-[#dec2cb] flex items-center justify-between gap-2.5 shadow-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setLightboxData({
+                                isOpen: true,
+                                imageUrl: currentVaccinationCardUrl,
+                                title: `Carteirinha de Vacinação • ${pet.nameAndBreed}`,
+                                subtitle: 'Comprovante com selos, vacinas e carimbos veterinários',
+                              })
+                            }
+                            className="relative group w-14 h-14 rounded-lg overflow-hidden border border-[#92a8d1] shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#92a8d1]"
+                            title="Clique para ler vacinas e datas com zoom"
+                          >
+                            <img
+                              src={currentVaccinationCardUrl}
+                              alt="Carteirinha de Vacinação"
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                              <ZoomIn className="w-4 h-4 text-white" />
+                            </div>
+                          </button>
+
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-[#1E293B] block truncate">
+                              Comprovante Anexado
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setLightboxData({
+                                  isOpen: true,
+                                  imageUrl: currentVaccinationCardUrl,
+                                  title: `Carteirinha de Vacinação • ${pet.nameAndBreed}`,
+                                  subtitle: 'Comprovante com selos, vacinas e carimbos veterinários',
+                                })
+                              }
+                              className="text-[11px] font-semibold text-[#2D3E5E] hover:underline flex items-center gap-1 cursor-pointer mt-0.5"
+                            >
+                              <Eye className="w-3 h-3 text-[#2D3E5E]" />
+                              <span>Ampliar com Zoom</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {/* Replace Card Button */}
+                          <label className="cursor-pointer min-h-[38px] min-w-[38px] p-2 rounded-xl bg-[#FAF8F9] hover:bg-[#F3EFF2] text-[#1E293B] border border-[#c5b9cd] flex items-center justify-center transition shadow-xs" title="Substituir Carteirinha">
+                            {uploadingVaccinationCard ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2D3E5E]" />
+                            ) : (
+                              <Camera className="w-3.5 h-3.5 text-[#2D3E5E]" />
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={uploadingVaccinationCard}
+                              onChange={handleVaccinationCardUpload}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {/* Remove Card Button */}
+                          <button
+                            type="button"
+                            disabled={uploadingVaccinationCard}
+                            onClick={handleRemoveVaccinationCard}
+                            className="min-h-[38px] min-w-[38px] p-2 rounded-xl bg-[#FEE2E2] hover:bg-[#FCA5A5] text-[#991B1B] border border-[#FECACA] flex items-center justify-center transition cursor-pointer shadow-xs"
+                            title="Remover Comprovante"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-white border border-dashed border-[#dec2cb] flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                        <div className="text-center sm:text-left">
+                          <p className="text-xs font-semibold text-[#1E293B]">
+                            Nenhum comprovante anexado
+                          </p>
+                          <p className="text-[10px] text-[#64748B]">
+                            Fotografe ou anexe a carteirinha física de vacinação deste pet.
+                          </p>
+                        </div>
+
+                        <label className="cursor-pointer min-h-[40px] px-3.5 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] text-[#1E293B] text-xs font-bold border border-[#7b93c2] shadow-sm transition flex items-center justify-center gap-1.5 shrink-0">
+                          {uploadingVaccinationCard ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1E293B]" />
+                              <span>Compactando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Paperclip className="w-3.5 h-3.5 text-[#1E293B]" />
+                              <span>Anexar Carteirinha</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            disabled={uploadingVaccinationCard}
+                            onChange={handleVaccinationCardUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1397,6 +1635,15 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Full-Screen Image Lightbox Modal */}
+      <ImageLightboxModal
+        isOpen={lightboxData.isOpen}
+        imageUrl={lightboxData.imageUrl}
+        title={lightboxData.title}
+        subtitle={lightboxData.subtitle}
+        onClose={() => setLightboxData((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

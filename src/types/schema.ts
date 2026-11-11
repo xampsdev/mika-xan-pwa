@@ -102,6 +102,9 @@ export interface Pet {
   /** Field 22: Direct URL of the pet photo stored in Firebase Storage or CDN */
   photoUrl: string;
 
+  /** Field 23 (Admin): Direct URL / DataURL of the pet's vaccination card/booklet attachment */
+  vaccinationCardUrl?: string | null;
+
   /** Document creation timestamp */
   createdAt?: FirestoreDateTime;
 
