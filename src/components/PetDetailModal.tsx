@@ -114,6 +114,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16)
   );
   const [newStayNotes, setNewStayNotes] = useState<string>('');
+  const [newStayDogCount, setNewStayDogCount] = useState<number>(1);
   const [submittingStay, setSubmittingStay] = useState<boolean>(false);
 
   // Price Adjustment State per stay
@@ -127,8 +128,8 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     if (!newStayCheckIn || !newStayCheckOut) return null;
     const [inDate, inTime] = newStayCheckIn.split('T');
     const [outDate, outTime] = newStayCheckOut.split('T');
-    return calculateStayPricing(inDate, inTime, outDate, outTime);
-  }, [newStayCheckIn, newStayCheckOut]);
+    return calculateStayPricing(inDate, inTime, outDate, outTime, newStayDogCount);
+  }, [newStayCheckIn, newStayCheckOut, newStayDogCount]);
 
   useEffect(() => {
     if (pet) {
@@ -137,44 +138,74 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     }
   }, [pet]);
 
-  // Subscribe to real-time stays for this specific pet
+  // Subscribe to real-time stays for this specific pet (via primary petId or multi-dog petIds)
   useEffect(() => {
     if (!pet || !isOpen) return;
 
     setLoadingStays(true);
-    const staysQuery = query(collection(db, 'stays'), where('petId', '==', pet.id));
+    const primaryDocs = new Map<string, Stay>();
+    const multiDocs = new Map<string, Stay>();
 
-    const unsubscribe = onSnapshot(
-      staysQuery,
+    const syncMergedStays = (fromCache: boolean) => {
+      setStaysMetadataFromCache(fromCache);
+      const merged = new Map<string, Stay>([...primaryDocs, ...multiDocs]);
+      const staysList: Stay[] = [];
+      const notesMap: Record<string, string> = {};
+
+      merged.forEach((stayData) => {
+        staysList.push(stayData);
+        if (stayData.adminStayNotes !== undefined) {
+          notesMap[stayData.id] = stayData.adminStayNotes;
+        }
+      });
+
+      staysList.sort(
+        (a, b) => new Date(b.checkInDate).getTime() - new Date(a.checkInDate).getTime()
+      );
+
+      setStays(staysList);
+      setEditingStayNotes((prev) => ({ ...notesMap, ...prev }));
+      setLoadingStays(false);
+    };
+
+    const primaryQuery = query(collection(db, 'stays'), where('petId', '==', pet.id));
+    const multiQuery = query(collection(db, 'stays'), where('petIds', 'array-contains', pet.id));
+
+    const unsubPrimary = onSnapshot(
+      primaryQuery,
       { includeMetadataChanges: true },
       (snapshot: any) => {
-        setStaysMetadataFromCache(Boolean(snapshot.metadata?.fromCache));
-        const staysList: Stay[] = [];
-        const notesMap: Record<string, string> = {};
-
+        primaryDocs.clear();
         snapshot.forEach((docSnap: any) => {
-          const stayData = { id: docSnap.id, ...docSnap.data() } as Stay;
-          staysList.push(stayData);
-          if (stayData.adminStayNotes !== undefined) {
-            notesMap[stayData.id] = stayData.adminStayNotes;
-          }
+          primaryDocs.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Stay);
         });
-
-        staysList.sort(
-          (a, b) => new Date(b.checkInDate).getTime() - new Date(a.checkInDate).getTime()
-        );
-
-        setStays(staysList);
-        setEditingStayNotes((prev) => ({ ...notesMap, ...prev }));
-        setLoadingStays(false);
+        syncMergedStays(Boolean(snapshot.metadata?.fromCache));
       },
       (error: any) => {
-        console.warn('Stays listener error (offline cache active):', error);
+        console.warn('Stays primary listener error (offline cache active):', error);
         setLoadingStays(false);
       }
     );
 
-    return () => unsubscribe();
+    const unsubMulti = onSnapshot(
+      multiQuery,
+      { includeMetadataChanges: true },
+      (snapshot: any) => {
+        multiDocs.clear();
+        snapshot.forEach((docSnap: any) => {
+          multiDocs.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Stay);
+        });
+        syncMergedStays(Boolean(snapshot.metadata?.fromCache));
+      },
+      (error: any) => {
+        console.warn('Stays multi-dog listener error (offline cache active):', error);
+      }
+    );
+
+    return () => {
+      unsubPrimary();
+      unsubMulti();
+    };
   }, [pet, isOpen]);
 
   // Subscribe to private Admin Internal Notes (pet_admin_notes/{petId})
@@ -437,17 +468,19 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
     try {
       const [inDate, inTime] = newStayCheckIn.split('T');
       const [outDate, outTime] = newStayCheckOut.split('T');
-      const pricing = calculateStayPricing(inDate, inTime, outDate, outTime);
+      const pricing = calculateStayPricing(inDate, inTime, outDate, outTime, newStayDogCount);
 
       const newStayData: Omit<Stay, 'id'> = deepCleanUndefined({
         petId: pet.id,
+        petIds: [pet.id],
+        dogCount: newStayDogCount,
         tutorId: pet.tutorId,
         checkInDate: newStayCheckIn,
         checkOutDate: newStayCheckOut,
         status: 'active' as StayStatus,
         specialStayNotes: (newStayNotes || '').trim(),
-        estimatedTotal: pricing?.estimatedTotal ?? 0,
-        finalTotal: pricing?.estimatedTotal ?? 0,
+        estimatedTotal: pricing?.totalPrice ?? 0,
+        finalTotal: pricing?.totalPrice ?? 0,
         totalHours: pricing?.totalHours ?? 0,
         ...(pricing ? { pricingBreakdown: deepCleanUndefined(pricing) } : {}),
         createdAt: serverTimestamp(),
@@ -456,6 +489,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
       await addDoc(collection(db, 'stays'), deepCleanUndefined(newStayData));
       setShowNewStayForm(false);
       setNewStayNotes('');
+      setNewStayDogCount(1);
     } catch (err) {
       console.error('Error creating stay:', err);
       alert('Erro ao registrar nova estadia.');
@@ -1260,31 +1294,64 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E293B] mb-1">
-                      Instruções Específicas / Pertences
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Ração para 3 dias, coleira extra, medicação às 19h"
-                      value={newStayNotes}
-                      onChange={(e) => setNewStayNotes(e.target.value)}
-                      className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-3.5 py-2.5 text-base text-[#1E293B]"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-[#1E293B] mb-1">
+                        Instruções Específicas / Pertences
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Ração para 3 dias, coleira extra, medicação às 19h"
+                        value={newStayNotes}
+                        onChange={(e) => setNewStayNotes(e.target.value)}
+                        className="w-full min-h-[48px] bg-white border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] rounded-xl px-3.5 py-2.5 text-base text-[#1E293B]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-[#1E293B] mb-1">
+                        Qtd. de Cães
+                      </label>
+                      <div className="flex items-center justify-between bg-white border border-[#c5b9cd] rounded-xl px-2 min-h-[48px]">
+                        <button
+                          type="button"
+                          onClick={() => setNewStayDogCount((c) => Math.max(1, c - 1))}
+                          disabled={newStayDogCount <= 1}
+                          className="min-w-[36px] min-h-[36px] rounded-lg bg-[#FAF8F9] hover:bg-[#c5b9cd]/30 disabled:opacity-40 border border-[#dec2cb] text-sm font-black text-[#1E293B]"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-black text-[#1E293B] tabular-nums">
+                          {newStayDogCount} {newStayDogCount === 1 ? 'cão' : 'cães'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setNewStayDogCount((c) => Math.min(10, c + 1))}
+                          className="min-w-[36px] min-h-[36px] rounded-lg bg-[#FAF8F9] hover:bg-[#c5b9cd]/30 border border-[#dec2cb] text-sm font-black text-[#1E293B]"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   {newStayPricing && (
-                    <div className="p-3 rounded-xl bg-white border border-[#dec2cb] flex items-center justify-between text-xs">
+                    <div className="p-3 rounded-xl bg-white border border-[#dec2cb] flex items-center justify-between text-xs gap-2">
                       <div>
                         <span className="font-bold text-[#1E293B] block">
                           Estimativa: {newStayPricing.totalHours}h ({newStayPricing.summaryText})
                         </span>
-                        <span className="text-[10px] text-[#64748B]">
-                          Seg-Qui: R$ 79 | Sex-Dom: R$ 89 | Feriados/Alta: R$ 120
-                        </span>
+                        {newStayPricing.dogCount > 1 ? (
+                          <span className="text-[11px] font-semibold text-[#2D3E5E] tabular-nums">
+                            {formatBRL(newStayPricing.unitStayPrice)} × {newStayPricing.dogCount} cães = {formatBRL(newStayPricing.totalPrice)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-[#64748B]">
+                            Seg-Qui: R$ 79 | Sex-Dom: R$ 89 | Feriados/Alta: R$ 120
+                          </span>
+                        )}
                       </div>
-                      <span className="text-base font-black text-[#1E293B]">
-                        {formatBRL(newStayPricing.estimatedTotal)}
+                      <span className="text-base font-black text-[#1E293B] tabular-nums shrink-0">
+                        {formatBRL(newStayPricing.totalPrice)}
                       </span>
                     </div>
                   )}
@@ -1339,7 +1406,7 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center flex-wrap gap-2">
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                                   isActive
@@ -1351,6 +1418,11 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                               >
                                 {isActive ? 'Estadia Ativa' : isPending ? 'Check-in Pendente' : 'Concluída'}
                               </span>
+                              {(stay.dogCount || stay.petIds?.length || 1) > 1 && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f7cac9] text-[#1E293B] border border-[#dec2cb]">
+                                  {stay.dogCount || stay.petIds?.length} cães na estadia
+                                </span>
+                              )}
                               <span className="text-[11px] text-[#64748B] font-mono">
                                 ID: {stay.id.slice(0, 8)}
                               </span>
@@ -1405,17 +1477,39 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
 
                         {/* 24h Cycle Dynamic Pricing & Admin Adjustment */}
                         {(() => {
+                          const stayDogCount =
+                            stay.dogCount ||
+                            stay.pricingBreakdown?.dogCount ||
+                            (stay.petIds && stay.petIds.length > 0 ? stay.petIds.length : 1);
+
                           const stayPricing = stay.pricingBreakdown || (() => {
                             if (stay.checkInDate && stay.checkOutDate) {
                               const inParts = stay.checkInDate.includes('T') ? stay.checkInDate.split('T') : [stay.checkInDate, '10:00'];
                               const outParts = stay.checkOutDate.includes('T') ? stay.checkOutDate.split('T') : [stay.checkOutDate, '10:00'];
-                              return calculateStayPricing(inParts[0], inParts[1].slice(0, 5), outParts[0], outParts[1].slice(0, 5));
+                              return calculateStayPricing(
+                                inParts[0],
+                                inParts[1].slice(0, 5),
+                                outParts[0],
+                                outParts[1].slice(0, 5),
+                                stayDogCount
+                              );
                             }
                             return null;
                           })();
 
+                          const unitStayPrice =
+                            stayPricing?.unitStayPrice ??
+                            (stayPricing
+                              ? Math.round((stayPricing.estimatedTotal / stayDogCount) * 100) / 100
+                              : undefined);
+
                           const isAdjustingThisPrice = editingPriceStayId === stay.id;
-                          const finalOrEstTotal = stay.finalTotal ?? stay.estimatedTotal ?? stayPricing?.estimatedTotal ?? 0;
+                          const finalOrEstTotal =
+                            stay.finalTotal ??
+                            stay.estimatedTotal ??
+                            stayPricing?.totalPrice ??
+                            stayPricing?.estimatedTotal ??
+                            0;
                           const hasAdjustment =
                             stay.finalTotal !== undefined &&
                             stay.estimatedTotal !== undefined &&
@@ -1425,14 +1519,19 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                             <div className="mt-1 pt-2 border-t border-[#dec2cb]/60 space-y-2">
                               <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-2.5 rounded-xl border border-[#dec2cb]/60 text-xs">
                                 <div className="flex items-center gap-2">
-                                  <Calculator className="w-4 h-4 text-[#2D3E5E]" />
+                                  <Calculator className="w-4 h-4 text-[#2D3E5E] shrink-0" />
                                   <div>
-                                    <span className="font-black text-[#1E293B]">
+                                    <span className="font-black text-[#1E293B] tabular-nums">
                                       {formatBRL(finalOrEstTotal)}
                                     </span>
                                     {hasAdjustment && (
-                                      <span className="text-[10px] text-[#64748B] ml-1.5 line-through">
+                                      <span className="text-[10px] text-[#64748B] ml-1.5 line-through tabular-nums">
                                         {formatBRL(stay.estimatedTotal!)}
+                                      </span>
+                                    )}
+                                    {stayDogCount > 1 && unitStayPrice !== undefined && (
+                                      <span className="text-[10px] font-bold text-[#2D3E5E] ml-1.5 tabular-nums">
+                                        ({formatBRL(unitStayPrice)} × {stayDogCount} cães)
                                       </span>
                                     )}
                                     <span className="text-[10px] text-[#64748B] ml-1.5 font-medium">
@@ -1532,10 +1631,11 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const baseCyclesTotal = stayPricing.cyclesBreakdown
-                                            .filter((c) => c.type === 'full_cycle' || c.type === 'same_day_minimum')
-                                            .reduce((acc, c) => acc + c.rate, 0);
-                                          setAdjustedPriceInput(String(baseCyclesTotal));
+                                          const baseCyclesTotal =
+                                            stayPricing.cyclesBreakdown
+                                              .filter((c) => c.type === 'full_cycle' || c.type === 'same_day_minimum')
+                                              .reduce((acc, c) => acc + c.rate, 0) * stayDogCount;
+                                          setAdjustedPriceInput(String(Math.round(baseCyclesTotal * 100) / 100));
                                           setAdjustedReasonInput('Cortesia horas extras na saída');
                                         }}
                                         className="px-2 py-0.5 rounded bg-white border border-[#dec2cb] hover:bg-[#FAF8F9] text-[10px] font-semibold text-[#1E293B]"

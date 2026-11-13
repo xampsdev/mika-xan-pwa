@@ -220,11 +220,18 @@ export function calculateStayPricing(
   checkInDate: string,
   checkInTime: string,
   checkOutDate: string,
-  checkOutTime: string
+  checkOutTime: string,
+  dogCount: number = 1
 ): StayPricingCalculation | null {
   if (!checkInDate || !checkInTime || !checkOutDate || !checkOutTime) {
     return null;
   }
+
+  const numericDogCount = Number(dogCount);
+  const safeDogCount = Math.max(
+    1,
+    Math.floor(Number.isFinite(numericDogCount) ? numericDogCount : 1)
+  );
 
   const start = new Date(`${checkInDate}T${checkInTime}:00`);
   const end = new Date(`${checkOutDate}T${checkOutTime}:00`);
@@ -271,6 +278,8 @@ export function calculateStayPricing(
     });
 
     const summaryText = `${totalHours}h de estadia (1 diária mínima)`;
+    const unitStayPrice = Math.round(totalAmount * 100) / 100;
+    const totalPrice = Math.round(unitStayPrice * safeDogCount * 100) / 100;
 
     return {
       checkInDateTime: `${checkInDate}T${checkInTime}`,
@@ -279,7 +288,10 @@ export function calculateStayPricing(
       fullCycles: 1,
       extraHours: 0,
       overtimeType: 'none',
-      estimatedTotal: totalAmount,
+      unitStayPrice,
+      dogCount: safeDogCount,
+      totalPrice,
+      estimatedTotal: totalPrice,
       hasHalfDay: false,
       fullDaysCount: 1,
       cyclesBreakdown,
@@ -397,6 +409,9 @@ export function calculateStayPricing(
   else if (overtimeType === 'tolerance') summaryText += ' + tolerância';
   summaryText += ')';
 
+  const unitStayPrice = Math.round(totalAmount * 100) / 100;
+  const totalPrice = Math.round(unitStayPrice * safeDogCount * 100) / 100;
+
   return {
     checkInDateTime: `${checkInDate}T${checkInTime}`,
     checkOutDateTime: `${checkOutDate}T${checkOutTime}`,
@@ -404,7 +419,10 @@ export function calculateStayPricing(
     fullCycles,
     extraHours,
     overtimeType,
-    estimatedTotal: Math.round(totalAmount * 100) / 100,
+    unitStayPrice,
+    dogCount: safeDogCount,
+    totalPrice,
+    estimatedTotal: totalPrice,
     hasHalfDay,
     fullDaysCount,
     cyclesBreakdown,

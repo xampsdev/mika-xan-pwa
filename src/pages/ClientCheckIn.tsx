@@ -34,6 +34,9 @@ import {
   Receipt,
   Sparkles,
   ZoomIn,
+  Check,
+  Trash2,
+  Users,
 } from 'lucide-react';
 import { formatBrazilianPhone, isValidBrazilianPhone } from '@/utils/phone';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
@@ -41,6 +44,31 @@ import { sendNtfyAlert } from '@/lib/ntfy';
 import { calculateStayPricing, formatBRL } from '@/lib/pricingCalculator';
 import { ImageLightboxModal } from '@/components/ImageLightboxModal';
 import type { Tutor, Pet, Stay, StayStatus } from '@/types/schema';
+
+interface SessionPetDraft {
+  localKey: string;
+  existingPetId: string | null;
+  nameAndBreed: string;
+  ageAndWeight: string;
+  isNeutered: boolean;
+  behaviorPeopleAndAnimals: string;
+  allergiesAndProtocol: string;
+  continuousTreatmentDetails: string;
+  dietaryOrPhysicalRestrictions: string;
+  pastSevereIllnessOrChronic: string;
+  vaccinationUpToDate: boolean;
+  calmWhenAlone: boolean;
+  destroysOrIngestsObjects: boolean;
+  foodAmountAndSchedule: string;
+  treatsAndNaturalDiet: string;
+  walkFrequencyAndDuration: string;
+  sleepBedAndLocation: string;
+  pottyTrained: boolean;
+  bathProtocol: string;
+  generalNotes: string;
+  photoUrl: string;
+  selectedImageFile: File | null;
+}
 
 type FlowStage = 'phone_lookup' | 'returning_client' | 'intake_form' | 'success_confirmation';
 type FormSubStep = 'tutor_vet' | 'pet_health' | 'behavior_routine' | 'photo_stay';
@@ -130,7 +158,12 @@ export const ClientCheckIn: React.FC = () => {
   // Loaded Entities
   const [existingTutor, setExistingTutor] = useState<Tutor | null>(null);
   const [existingPets, setExistingPets] = useState<Pet[]>([]);
+  const [selectedExistingPetIds, setSelectedExistingPetIds] = useState<string[]>([]);
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
+
+  // Multi-dog Session Queue (stores previously added/selected pets besides the active formData pet)
+  const [queuedPets, setQueuedPets] = useState<SessionPetDraft[]>([]);
+  const [activeDraftKey, setActiveDraftKey] = useState<string>(() => `draft_${Date.now()}`);
 
   // Form & Image State
   const [formData, setFormData] = useState<FormDataState>(INITIAL_FORM_STATE);
@@ -140,6 +173,7 @@ export const ClientCheckIn: React.FC = () => {
   const [submissionSuccessData, setSubmissionSuccessData] = useState<{
     tutor: Tutor;
     pet: Pet;
+    pets: Pet[];
     stay: Stay;
   } | null>(null);
 
@@ -155,15 +189,134 @@ export const ClientCheckIn: React.FC = () => {
     title: '',
   });
 
-  // Live 24-Hour Cycle + Half-Day Dynamic Pricing Quote
+  // Helper: Snapshot current formData pet fields into a SessionPetDraft
+  const buildDraftFromForm = (): SessionPetDraft => ({
+    localKey: activeDraftKey,
+    existingPetId: selectedPetId,
+    nameAndBreed: formData.nameAndBreed,
+    ageAndWeight: formData.ageAndWeight,
+    isNeutered: formData.isNeutered,
+    behaviorPeopleAndAnimals: formData.behaviorPeopleAndAnimals,
+    allergiesAndProtocol: formData.allergiesAndProtocol,
+    continuousTreatmentDetails: formData.continuousTreatmentDetails,
+    dietaryOrPhysicalRestrictions: formData.dietaryOrPhysicalRestrictions,
+    pastSevereIllnessOrChronic: formData.pastSevereIllnessOrChronic,
+    vaccinationUpToDate: formData.vaccinationUpToDate,
+    calmWhenAlone: formData.calmWhenAlone,
+    destroysOrIngestsObjects: formData.destroysOrIngestsObjects,
+    foodAmountAndSchedule: formData.foodAmountAndSchedule,
+    treatsAndNaturalDiet: formData.treatsAndNaturalDiet,
+    walkFrequencyAndDuration: formData.walkFrequencyAndDuration,
+    sleepBedAndLocation: formData.sleepBedAndLocation,
+    pottyTrained: formData.pottyTrained,
+    bathProtocol: formData.bathProtocol,
+    generalNotes: formData.generalNotes,
+    photoUrl: formData.photoUrl,
+    selectedImageFile,
+  });
+
+  const petRecordToDraft = (pet: Pet, idx = 0): SessionPetDraft => ({
+    localKey: `pet_${pet.id}_${Date.now()}_${idx}`,
+    existingPetId: pet.id,
+    nameAndBreed: pet.nameAndBreed || '',
+    ageAndWeight: pet.ageAndWeight || '',
+    isNeutered: pet.isNeutered ?? true,
+    behaviorPeopleAndAnimals: pet.behaviorPeopleAndAnimals || '',
+    allergiesAndProtocol: pet.allergiesAndProtocol || '',
+    continuousTreatmentDetails: pet.continuousTreatmentDetails || '',
+    dietaryOrPhysicalRestrictions: pet.dietaryOrPhysicalRestrictions || '',
+    pastSevereIllnessOrChronic: pet.pastSevereIllnessOrChronic || '',
+    vaccinationUpToDate: pet.vaccinationUpToDate ?? true,
+    calmWhenAlone: pet.calmWhenAlone ?? true,
+    destroysOrIngestsObjects: pet.destroysOrIngestsObjects ?? false,
+    foodAmountAndSchedule: pet.foodAmountAndSchedule || '',
+    treatsAndNaturalDiet: pet.treatsAndNaturalDiet || '',
+    walkFrequencyAndDuration: pet.walkFrequencyAndDuration || '',
+    sleepBedAndLocation: pet.sleepBedAndLocation || '',
+    pottyTrained: pet.pottyTrained ?? true,
+    bathProtocol: pet.bathProtocol || '',
+    generalNotes: pet.generalNotes || '',
+    photoUrl: pet.photoUrl || '',
+    selectedImageFile: null,
+  });
+
+  const applyDraftToForm = (draft: SessionPetDraft) => {
+    setActiveDraftKey(draft.localKey);
+    setSelectedPetId(draft.existingPetId);
+    setSelectedImageFile(draft.selectedImageFile);
+    setCompressedPreview(draft.photoUrl || null);
+    setFormData((prev) => ({
+      ...prev,
+      nameAndBreed: draft.nameAndBreed,
+      ageAndWeight: draft.ageAndWeight,
+      isNeutered: draft.isNeutered,
+      behaviorPeopleAndAnimals: draft.behaviorPeopleAndAnimals,
+      allergiesAndProtocol: draft.allergiesAndProtocol,
+      continuousTreatmentDetails: draft.continuousTreatmentDetails,
+      dietaryOrPhysicalRestrictions: draft.dietaryOrPhysicalRestrictions,
+      pastSevereIllnessOrChronic: draft.pastSevereIllnessOrChronic,
+      vaccinationUpToDate: draft.vaccinationUpToDate,
+      calmWhenAlone: draft.calmWhenAlone,
+      destroysOrIngestsObjects: draft.destroysOrIngestsObjects,
+      foodAmountAndSchedule: draft.foodAmountAndSchedule,
+      treatsAndNaturalDiet: draft.treatsAndNaturalDiet,
+      walkFrequencyAndDuration: draft.walkFrequencyAndDuration,
+      sleepBedAndLocation: draft.sleepBedAndLocation,
+      pottyTrained: draft.pottyTrained,
+      bathProtocol: draft.bathProtocol,
+      generalNotes: draft.generalNotes,
+      photoUrl: draft.photoUrl,
+    }));
+  };
+
+  const resetFormPetFields = () => {
+    setActiveDraftKey(`draft_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
+    setSelectedPetId(null);
+    setSelectedImageFile(null);
+    setCompressedPreview(null);
+    setFormData((prev) => ({
+      ...INITIAL_FORM_STATE,
+      fullName: prev.fullName,
+      phoneDDD: prev.phoneDDD,
+      vetNameAndPhone: prev.vetNameAndPhone,
+      checkInDate: prev.checkInDate,
+      checkInTime: prev.checkInTime,
+      checkOutDate: prev.checkOutDate,
+      checkOutTime: prev.checkOutTime,
+      specialStayNotes: prev.specialStayNotes,
+    }));
+  };
+
+  // All pets currently included in this reservation session
+  const sessionBookingPets = useMemo<SessionPetDraft[]>(() => {
+    const currentDraft = buildDraftFromForm();
+    if (queuedPets.length === 0) {
+      return [currentDraft];
+    }
+    if (formData.nameAndBreed.trim() !== '') {
+      return [...queuedPets, currentDraft];
+    }
+    return queuedPets;
+  }, [queuedPets, formData, selectedPetId, selectedImageFile, activeDraftKey]);
+
+  const bookingDogCount = Math.max(1, sessionBookingPets.length);
+
+  // Live 24-Hour Cycle + Half-Day Dynamic Pricing Quote (multiplied by dogCount)
   const livePricingQuote = useMemo(() => {
     return calculateStayPricing(
       formData.checkInDate,
       formData.checkInTime,
       formData.checkOutDate,
-      formData.checkOutTime
+      formData.checkOutTime,
+      bookingDogCount
     );
-  }, [formData.checkInDate, formData.checkInTime, formData.checkOutDate, formData.checkOutTime]);
+  }, [
+    formData.checkInDate,
+    formData.checkInTime,
+    formData.checkOutDate,
+    formData.checkOutTime,
+    bookingDogCount,
+  ]);
 
   // 1. Phone Lookup Handler
   const handlePhoneLookup = async (e?: React.FormEvent) => {
@@ -199,11 +352,16 @@ export const ClientCheckIn: React.FC = () => {
         });
 
         setExistingPets(petsList);
+        setSelectedExistingPetIds([]);
+        setQueuedPets([]);
         setStage('returning_client');
       } else {
         setExistingTutor(null);
         setExistingPets([]);
+        setSelectedExistingPetIds([]);
+        setQueuedPets([]);
         setSelectedPetId(null);
+        setActiveDraftKey(`draft_${Date.now()}`);
         setFormData({
           ...INITIAL_FORM_STATE,
           phoneDDD: formatted,
@@ -216,6 +374,8 @@ export const ClientCheckIn: React.FC = () => {
       }
     } catch (err: unknown) {
       console.warn('Firestore query error (fallback to new intake):', err);
+      setQueuedPets([]);
+      setSelectedExistingPetIds([]);
       setFormData({
         ...INITIAL_FORM_STATE,
         phoneDDD: formatted,
@@ -230,51 +390,78 @@ export const ClientCheckIn: React.FC = () => {
     }
   };
 
-  // Returning Client: Select existing Pet
-  const handleSelectExistingPet = (pet: Pet) => {
+  // Toggle selection of an existing pet on Stage 2
+  const toggleExistingPetSelection = (petId: string) => {
+    setSelectedExistingPetIds((prev) =>
+      prev.includes(petId) ? prev.filter((id) => id !== petId) : [...prev, petId]
+    );
+  };
+
+  // Returning Client: Proceed with 1 or multiple selected existing pets
+  const handleProceedWithSelectedPets = (petsOverride?: Pet[]) => {
     if (!existingTutor) return;
-    setSelectedPetId(pet.id);
+    const chosenPets =
+      petsOverride || existingPets.filter((p) => selectedExistingPetIds.includes(p.id));
+    if (chosenPets.length === 0) return;
+
+    const priorDrafts = chosenPets.slice(0, -1).map((p, idx) => petRecordToDraft(p, idx));
+    const activePet = chosenPets[chosenPets.length - 1];
+    const activeDraft = petRecordToDraft(activePet, chosenPets.length - 1);
+
+    setQueuedPets(priorDrafts);
+    setSelectedPetId(activePet.id);
+    setActiveDraftKey(activeDraft.localKey);
+    setSelectedImageFile(null);
+    setCompressedPreview(activePet.photoUrl || null);
     setFormData({
       fullName: existingTutor.fullName || '',
       phoneDDD: existingTutor.phoneDDD || '',
       vetNameAndPhone: existingTutor.vetNameAndPhone || '',
-      nameAndBreed: pet.nameAndBreed || '',
-      ageAndWeight: pet.ageAndWeight || '',
-      isNeutered: pet.isNeutered ?? true,
-      behaviorPeopleAndAnimals: pet.behaviorPeopleAndAnimals || '',
-      allergiesAndProtocol: pet.allergiesAndProtocol || '',
-      continuousTreatmentDetails: pet.continuousTreatmentDetails || '',
-      dietaryOrPhysicalRestrictions: pet.dietaryOrPhysicalRestrictions || '',
-      pastSevereIllnessOrChronic: pet.pastSevereIllnessOrChronic || '',
-      vaccinationUpToDate: pet.vaccinationUpToDate ?? true,
-      calmWhenAlone: pet.calmWhenAlone ?? true,
-      destroysOrIngestsObjects: pet.destroysOrIngestsObjects ?? false,
-      foodAmountAndSchedule: pet.foodAmountAndSchedule || '',
-      treatsAndNaturalDiet: pet.treatsAndNaturalDiet || '',
-      walkFrequencyAndDuration: pet.walkFrequencyAndDuration || '',
-      sleepBedAndLocation: pet.sleepBedAndLocation || '',
-      pottyTrained: pet.pottyTrained ?? true,
-      bathProtocol: pet.bathProtocol || '',
-      generalNotes: pet.generalNotes || '',
-      photoUrl: pet.photoUrl || '',
+      nameAndBreed: activePet.nameAndBreed || '',
+      ageAndWeight: activePet.ageAndWeight || '',
+      isNeutered: activePet.isNeutered ?? true,
+      behaviorPeopleAndAnimals: activePet.behaviorPeopleAndAnimals || '',
+      allergiesAndProtocol: activePet.allergiesAndProtocol || '',
+      continuousTreatmentDetails: activePet.continuousTreatmentDetails || '',
+      dietaryOrPhysicalRestrictions: activePet.dietaryOrPhysicalRestrictions || '',
+      pastSevereIllnessOrChronic: activePet.pastSevereIllnessOrChronic || '',
+      vaccinationUpToDate: activePet.vaccinationUpToDate ?? true,
+      calmWhenAlone: activePet.calmWhenAlone ?? true,
+      destroysOrIngestsObjects: activePet.destroysOrIngestsObjects ?? false,
+      foodAmountAndSchedule: activePet.foodAmountAndSchedule || '',
+      treatsAndNaturalDiet: activePet.treatsAndNaturalDiet || '',
+      walkFrequencyAndDuration: activePet.walkFrequencyAndDuration || '',
+      sleepBedAndLocation: activePet.sleepBedAndLocation || '',
+      pottyTrained: activePet.pottyTrained ?? true,
+      bathProtocol: activePet.bathProtocol || '',
+      generalNotes: activePet.generalNotes || '',
+      photoUrl: activePet.photoUrl || '',
       checkInDate: '',
       checkInTime: '',
       checkOutDate: '',
       checkOutTime: '',
       specialStayNotes: '',
     });
-    setCompressedPreview(pet.photoUrl || null);
     setDateConfirmationChecked(false);
-    setSubStep('tutor_vet');
+    setSubStep(chosenPets.length > 1 ? 'photo_stay' : 'tutor_vet');
     setStage('intake_form');
     setStepTransitionLock(true);
     setTimeout(() => setStepTransitionLock(false), 500);
   };
 
+  // Returning Client: Quick single-pet selection
+  const handleSelectExistingPet = (pet: Pet) => {
+    setSelectedExistingPetIds([pet.id]);
+    handleProceedWithSelectedPets([pet]);
+  };
+
   // Returning Client: Register new Pet under existing Tutor
   const handleRegisterNewPetForTutor = () => {
     if (!existingTutor) return;
+    setQueuedPets([]);
+    setSelectedExistingPetIds([]);
     setSelectedPetId(null);
+    setActiveDraftKey(`draft_${Date.now()}`);
     setFormData({
       ...INITIAL_FORM_STATE,
       fullName: existingTutor.fullName,
@@ -291,6 +478,57 @@ export const ClientCheckIn: React.FC = () => {
     setStage('intake_form');
     setStepTransitionLock(true);
     setTimeout(() => setStepTransitionLock(false), 500);
+  };
+
+  // Session Multi-Dog: Save current pet draft & start adding another dog
+  const handleAddAnotherDogInSession = () => {
+    if (!formData.nameAndBreed.trim() || !formData.ageAndWeight.trim()) {
+      alert('Preencha pelo menos o Nome/Raça e Idade/Peso do pet atual antes de adicionar outro cão.');
+      changeSubStep('pet_health');
+      return;
+    }
+    const currentDraft = buildDraftFromForm();
+    setQueuedPets((prev) => [...prev, currentDraft]);
+    resetFormPetFields();
+    changeSubStep('pet_health');
+  };
+
+  // Session Multi-Dog: Include another already-registered sibling pet on photo_stay
+  const handleAddExistingSiblingToSession = (pet: Pet) => {
+    const alreadyInSession = sessionBookingPets.some((d) => d.existingPetId === pet.id);
+    if (alreadyInSession) return;
+    const siblingDraft = petRecordToDraft(pet, sessionBookingPets.length);
+    if (!formData.nameAndBreed.trim()) {
+      applyDraftToForm(siblingDraft);
+    } else {
+      setQueuedPets((prev) => [...prev, siblingDraft]);
+    }
+  };
+
+  // Session Multi-Dog: Switch active form to edit a queued pet
+  const handleEditQueuedPet = (targetKey: string) => {
+    const target = queuedPets.find((p) => p.localKey === targetKey);
+    if (!target) return;
+    const remaining = queuedPets.filter((p) => p.localKey !== targetKey);
+    if (formData.nameAndBreed.trim()) {
+      remaining.push(buildDraftFromForm());
+    }
+    setQueuedPets(remaining);
+    applyDraftToForm(target);
+    changeSubStep('pet_health');
+  };
+
+  // Session Multi-Dog: Remove a pet from the reservation session
+  const handleRemoveSessionPet = (targetKey: string) => {
+    if (sessionBookingPets.length <= 1) return;
+    if (targetKey === activeDraftKey) {
+      if (queuedPets.length === 0) return;
+      const nextActive = queuedPets[queuedPets.length - 1];
+      setQueuedPets((prev) => prev.slice(0, -1));
+      applyDraftToForm(nextActive);
+    } else {
+      setQueuedPets((prev) => prev.filter((p) => p.localKey !== targetKey));
+    }
   };
 
   // Image Selection & Client-Side Compression (DataURL for Firestore)
@@ -350,55 +588,80 @@ export const ClientCheckIn: React.FC = () => {
         tutorId = newTutorRef.id;
       }
 
-      // 2. Prepare compressed photo DataURL
-      let uploadedPhotoUrl = formData.photoUrl;
-      if (selectedImageFile && (!uploadedPhotoUrl || uploadedPhotoUrl.length < 50)) {
-        try {
-          uploadedPhotoUrl = await compressImageToDataUrl(selectedImageFile, 600, 0.7);
-        } catch (imgErr) {
-          console.warn('Image processing fallback:', imgErr);
-        }
+      // 2. Determine all pets in this reservation session & validate
+      const petsToPersist = sessionBookingPets.filter((p) => p.nameAndBreed.trim() !== '');
+      if (petsToPersist.length === 0) {
+        alert('Por favor informe os dados de pelo menos 1 cão antes de finalizar.');
+        setSubmitting(false);
+        changeSubStep('pet_health');
+        return;
       }
 
-      // 3. Resolve Pet Doc
-      let petId = selectedPetId;
+      // 3. Upsert all Pet Docs in session
       const resolvedTutorId = tutorId || `tutor_${Date.now()}`;
-      const petPayload = deepCleanUndefined({
-        tutorId: resolvedTutorId,
-        nameAndBreed: (formData.nameAndBreed || '').trim(),
-        ageAndWeight: (formData.ageAndWeight || '').trim(),
-        isNeutered: Boolean(formData.isNeutered),
-        behaviorPeopleAndAnimals: (formData.behaviorPeopleAndAnimals || '').trim(),
-        allergiesAndProtocol: (formData.allergiesAndProtocol || '').trim(),
-        continuousTreatmentDetails: (formData.continuousTreatmentDetails || '').trim(),
-        dietaryOrPhysicalRestrictions: (formData.dietaryOrPhysicalRestrictions || '').trim(),
-        pastSevereIllnessOrChronic: (formData.pastSevereIllnessOrChronic || '').trim(),
-        vaccinationUpToDate: Boolean(formData.vaccinationUpToDate),
-        calmWhenAlone: Boolean(formData.calmWhenAlone),
-        destroysOrIngestsObjects: Boolean(formData.destroysOrIngestsObjects),
-        foodAmountAndSchedule: (formData.foodAmountAndSchedule || '').trim(),
-        treatsAndNaturalDiet: (formData.treatsAndNaturalDiet || '').trim(),
-        walkFrequencyAndDuration: (formData.walkFrequencyAndDuration || '').trim(),
-        sleepBedAndLocation: (formData.sleepBedAndLocation || '').trim(),
-        pottyTrained: Boolean(formData.pottyTrained),
-        bathProtocol: (formData.bathProtocol || '').trim(),
-        generalNotes: (formData.generalNotes || '').trim(),
-        photoUrl: uploadedPhotoUrl || '',
-        updatedAt: serverTimestamp(),
-      });
+      const savedPets: Pet[] = [];
 
-      if (petId) {
-        await setDoc(doc(db, 'pets', petId), deepCleanUndefined(petPayload), { merge: true });
-      } else {
-        const newPetRef = await addDoc(collection(db, 'pets'), deepCleanUndefined({
+      for (const draft of petsToPersist) {
+        let uploadedPhotoUrl = draft.photoUrl;
+        if (draft.selectedImageFile && (!uploadedPhotoUrl || uploadedPhotoUrl.length < 50)) {
+          try {
+            uploadedPhotoUrl = await compressImageToDataUrl(draft.selectedImageFile, 600, 0.7);
+          } catch (imgErr) {
+            console.warn('Image processing fallback:', imgErr);
+          }
+        }
+
+        const petPayload = deepCleanUndefined({
+          tutorId: resolvedTutorId,
+          nameAndBreed: (draft.nameAndBreed || '').trim(),
+          ageAndWeight: (draft.ageAndWeight || '').trim(),
+          isNeutered: Boolean(draft.isNeutered),
+          behaviorPeopleAndAnimals: (draft.behaviorPeopleAndAnimals || '').trim(),
+          allergiesAndProtocol: (draft.allergiesAndProtocol || '').trim(),
+          continuousTreatmentDetails: (draft.continuousTreatmentDetails || '').trim(),
+          dietaryOrPhysicalRestrictions: (draft.dietaryOrPhysicalRestrictions || '').trim(),
+          pastSevereIllnessOrChronic: (draft.pastSevereIllnessOrChronic || '').trim(),
+          vaccinationUpToDate: Boolean(draft.vaccinationUpToDate),
+          calmWhenAlone: Boolean(draft.calmWhenAlone),
+          destroysOrIngestsObjects: Boolean(draft.destroysOrIngestsObjects),
+          foodAmountAndSchedule: (draft.foodAmountAndSchedule || '').trim(),
+          treatsAndNaturalDiet: (draft.treatsAndNaturalDiet || '').trim(),
+          walkFrequencyAndDuration: (draft.walkFrequencyAndDuration || '').trim(),
+          sleepBedAndLocation: (draft.sleepBedAndLocation || '').trim(),
+          pottyTrained: Boolean(draft.pottyTrained),
+          bathProtocol: (draft.bathProtocol || '').trim(),
+          generalNotes: (draft.generalNotes || '').trim(),
+          photoUrl: uploadedPhotoUrl || '',
+          updatedAt: serverTimestamp(),
+        });
+
+        let resolvedPetId = draft.existingPetId;
+        if (resolvedPetId) {
+          await setDoc(doc(db, 'pets', resolvedPetId), deepCleanUndefined(petPayload), { merge: true });
+        } else {
+          const newPetRef = await addDoc(
+            collection(db, 'pets'),
+            deepCleanUndefined({
+              ...petPayload,
+              createdAt: serverTimestamp(),
+            })
+          );
+          resolvedPetId = newPetRef.id;
+        }
+
+        savedPets.push({
+          id: resolvedPetId || `pet_${Date.now()}_${savedPets.length}`,
           ...petPayload,
-          createdAt: serverTimestamp(),
-        }));
-        petId = newPetRef.id;
+          tutorId: resolvedTutorId,
+          createdAt: new Date(),
+        } as Pet);
       }
 
-      // 4. Create Stay Doc (combined date + time) with 24h Cycle Pricing
-      const resolvedPetId = petId || `pet_${Date.now()}`;
+      // 4. Create Stay Doc (combined date + time) with Multi-Dog 24h Cycle Pricing
+      const resolvedPetIds = savedPets.map((p) => p.id);
+      const finalDogCount = resolvedPetIds.length;
+      const primaryPetId = resolvedPetIds[0];
+
       const safeCheckInDate = formData.checkInDate || '';
       const safeCheckInTime = formData.checkInTime || '08:00';
       const safeCheckOutDate = formData.checkOutDate || '';
@@ -410,20 +673,23 @@ export const ClientCheckIn: React.FC = () => {
         safeCheckInDate,
         safeCheckInTime,
         safeCheckOutDate,
-        safeCheckOutTime
+        safeCheckOutTime,
+        finalDogCount
       );
 
       const cleanedPricingBreakdown = pricing ? deepCleanUndefined(pricing) : null;
 
       const stayPayload: Omit<Stay, 'id'> = deepCleanUndefined({
-        petId: resolvedPetId,
+        petId: primaryPetId,
+        petIds: resolvedPetIds,
+        dogCount: finalDogCount,
         tutorId: resolvedTutorId,
         checkInDate: checkInCombined,
         checkOutDate: checkOutCombined,
         status: 'pending' as StayStatus,
         specialStayNotes: (formData.specialStayNotes || '').trim(),
-        estimatedTotal: pricing?.estimatedTotal ?? 0,
-        finalTotal: pricing?.estimatedTotal ?? 0,
+        estimatedTotal: pricing?.totalPrice ?? 0,
+        finalTotal: pricing?.totalPrice ?? 0,
         totalHours: pricing?.totalHours ?? 0,
         ...(cleanedPricingBreakdown ? { pricingBreakdown: cleanedPricingBreakdown } : {}),
         createdAt: serverTimestamp(),
@@ -433,15 +699,26 @@ export const ClientCheckIn: React.FC = () => {
 
       setSubmissionSuccessData({
         tutor: { id: resolvedTutorId, ...tutorPayload, createdAt: new Date() },
-        pet: { id: resolvedPetId, ...petPayload, tutorId: resolvedTutorId, createdAt: new Date() },
-        stay: { id: stayRef.id, ...stayPayload, tutorId: resolvedTutorId, petId: resolvedPetId, createdAt: new Date() },
+        pet: savedPets[0],
+        pets: savedPets,
+        stay: {
+          id: stayRef.id,
+          ...stayPayload,
+          tutorId: resolvedTutorId,
+          petId: primaryPetId,
+          petIds: resolvedPetIds,
+          dogCount: finalDogCount,
+          createdAt: new Date(),
+        },
       });
 
-      // CORS-safe 24/7 background push alert with estimated pricing
-      const priceText = pricing ? ` • Total: ${formatBRL(pricing.estimatedTotal)}` : '';
+      // CORS-safe 24/7 background push alert with estimated pricing & multi-dog summary
+      const petNamesSummary = savedPets.map((p) => p.nameAndBreed).join(', ');
+      const dogsCountLabel = finalDogCount > 1 ? ` (${finalDogCount} cães)` : '';
+      const priceText = pricing ? ` • Total: ${formatBRL(pricing.totalPrice)}` : '';
       await sendNtfyAlert(
-        'Novo Check-in Mika & Xan!',
-        `Pet: ${formData.nameAndBreed.trim()} | Tutor: ${formData.fullName.trim()}${priceText}`
+        `Novo Check-in Mika & Xan${dogsCountLabel}!`,
+        `Pets: ${petNamesSummary} | Tutor: ${formData.fullName.trim()}${priceText}`
       );
 
       setStage('success_confirmation');
@@ -553,10 +830,10 @@ export const ClientCheckIn: React.FC = () => {
 
           <div>
             <h3 className="text-sm font-bold text-[#1E293B] mb-1">
-              Selecione o pet para a nova hospedagem:
+              Selecione 1 ou mais pets para a mesma hospedagem:
             </h3>
             <p className="text-xs text-[#64748B] mb-4">
-              Os 22 campos do perfil selecionado serão preenchidos automaticamente.
+              Você pode selecionar múltiplos cães da família para calcular a diária combinada automaticamente.
             </p>
 
             {existingPets.length === 0 ? (
@@ -565,67 +842,108 @@ export const ClientCheckIn: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3">
-                {existingPets.map((pet) => (
-                  <div
-                    key={pet.id}
-                    className="p-4 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60 hover:border-[#92a8d1] transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      {pet.photoUrl ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setLightboxData({
-                              isOpen: true,
-                              imageUrl: pet.photoUrl,
-                              title: pet.nameAndBreed,
-                              subtitle: `Foto Cadastrada • ${pet.ageAndWeight}`,
-                            })
-                          }
-                          className="relative group w-14 h-14 rounded-2xl overflow-hidden border border-[#dec2cb] shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#92a8d1]"
-                          title="Ampliar foto do pet"
-                        >
-                          <img
-                            src={pet.photoUrl}
-                            alt={pet.nameAndBreed}
-                            className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-                          />
-                          <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                            <ZoomIn className="w-4 h-4 text-white" />
+                {existingPets.map((pet) => {
+                  const isSelected = selectedExistingPetIds.includes(pet.id);
+                  return (
+                    <div
+                      key={pet.id}
+                      className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-[#92a8d1]/15 border-[#92a8d1] ring-1 ring-[#92a8d1]'
+                          : 'bg-[#FAF8F9] border-[#dec2cb]/60 hover:border-[#92a8d1]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {pet.photoUrl ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setLightboxData({
+                                isOpen: true,
+                                imageUrl: pet.photoUrl,
+                                title: pet.nameAndBreed,
+                                subtitle: `Foto Cadastrada • ${pet.ageAndWeight}`,
+                              })
+                            }
+                            className="relative group w-14 h-14 rounded-2xl overflow-hidden border border-[#dec2cb] shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#92a8d1]"
+                            title="Ampliar foto do pet"
+                          >
+                            <img
+                              src={pet.photoUrl}
+                              alt={pet.nameAndBreed}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                            />
+                            <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                              <ZoomIn className="w-4 h-4 text-white" />
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="w-14 h-14 rounded-2xl bg-[#c5b9cd]/30 text-[#1E293B] border border-[#dec2cb] flex items-center justify-center shrink-0">
+                            <Dog className="w-7 h-7" />
                           </div>
-                        </button>
-                      ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-[#c5b9cd]/30 text-[#1E293B] border border-[#dec2cb] flex items-center justify-center shrink-0">
-                          <Dog className="w-7 h-7" />
-                        </div>
-                      )}
-                      <div>
-                        <h4 className="text-sm font-bold text-[#1E293B]">{pet.nameAndBreed}</h4>
-                        <p className="text-xs text-[#64748B]">{pet.ageAndWeight}</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {pet.isNeutered && (
-                            <span className="text-[10px] bg-[#d2e3d8] text-[#133E26] px-1.5 py-0.5 rounded border border-[#a3cbb1] font-bold">
-                              Castrado
-                            </span>
-                          )}
-                          {pet.vaccinationUpToDate && (
-                            <span className="text-[10px] bg-[#92a8d1]/30 text-[#1E293B] px-1.5 py-0.5 rounded border border-[#7b93c2]/40 font-bold">
-                              Vacinas OK
-                            </span>
-                          )}
+                        )}
+                        <div>
+                          <h4 className="text-sm font-bold text-[#1E293B]">{pet.nameAndBreed}</h4>
+                          <p className="text-xs text-[#64748B]">{pet.ageAndWeight}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {pet.isNeutered && (
+                              <span className="text-[10px] bg-[#d2e3d8] text-[#133E26] px-1.5 py-0.5 rounded border border-[#a3cbb1] font-bold">
+                                Castrado
+                              </span>
+                            )}
+                            {pet.vaccinationUpToDate && (
+                              <span className="text-[10px] bg-[#92a8d1]/30 text-[#1E293B] px-1.5 py-0.5 rounded border border-[#7b93c2]/40 font-bold">
+                                Vacinas OK
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <button
-                      onClick={() => handleSelectExistingPet(pet)}
-                      className="min-h-[44px] px-4 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] text-[#1E293B] text-xs font-bold border border-[#7b93c2] flex items-center justify-center gap-1.5 transition shadow-sm"
-                    >
-                      <span>Check-in com este Pet</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2">
+                        {existingPets.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleExistingPetSelection(pet.id)}
+                            className={`min-h-[44px] px-3.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#2D3E5E] text-white border-[#1E293B]'
+                                : 'bg-white text-[#1E293B] border-[#c5b9cd] hover:border-[#92a8d1]'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3.5 h-3.5 text-[#92a8d1]" />}
+                            <span>{isSelected ? 'Selecionado' : 'Selecionar'}</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectExistingPet(pet)}
+                          className="flex-1 sm:flex-initial min-h-[44px] px-4 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] text-[#1E293B] text-xs font-bold border border-[#7b93c2] flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+                        >
+                          <span>{existingPets.length > 1 ? 'Só este' : 'Check-in com este Pet'}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {selectedExistingPetIds.length > 0 && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => handleProceedWithSelectedPets()}
+                  className="w-full min-h-[48px] px-5 rounded-xl bg-[#2D3E5E] hover:bg-[#1E293B] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-[#92a8d1]" />
+                  <span>
+                    Continuar com {selectedExistingPetIds.length}{' '}
+                    {selectedExistingPetIds.length === 1 ? 'Cão Selecionado' : 'Cães Selecionados'}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-[#92a8d1]" />
+                </button>
               </div>
             )}
           </div>
@@ -649,15 +967,22 @@ export const ClientCheckIn: React.FC = () => {
         <div className="bg-white border border-[#dec2cb]/60 rounded-3xl shadow-sm overflow-hidden pb-24 sm:pb-28">
           {/* Progress Header with Rose Quartz & Serenity theme */}
           <div className="border-b border-[#dec2cb]/60 p-4 sm:p-5 bg-gradient-to-r from-[#f7cac9]/30 via-[#c5b9cd]/30 to-[#92a8d1]/30">
-            <div className="flex items-center justify-between text-xs mb-2.5">
-              <span className="font-bold text-[#1E293B]">
-                {selectedPetId
-                  ? 'Revisão & Check-in'
-                  : existingTutor
-                    ? 'Novo Pet para Tutor'
-                    : 'Ficha Cadastral (22 Campos)'}
-              </span>
-              <span className="text-[#64748B] font-bold text-[11px]">
+            <div className="flex items-center justify-between text-xs mb-2.5 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-bold text-[#1E293B] truncate">
+                  {selectedPetId
+                    ? 'Revisão & Check-in'
+                    : existingTutor
+                      ? 'Novo Pet para Tutor'
+                      : 'Ficha Cadastral (22 Campos)'}
+                </span>
+                {(bookingDogCount > 1 || queuedPets.length > 0) && (
+                  <span className="text-[10px] font-bold text-[#1E293B] bg-[#f7cac9] border border-[#dec2cb] px-2 py-0.5 rounded-full shrink-0">
+                    {bookingDogCount} {bookingDogCount === 1 ? 'cão' : 'cães'}
+                  </span>
+                )}
+              </div>
+              <span className="text-[#64748B] font-bold text-[11px] shrink-0">
                 {subStep === 'tutor_vet' && '1/4: Tutor & Vet'}
                 {subStep === 'pet_health' && '2/4: Pet & Saúde'}
                 {subStep === 'behavior_routine' && '3/4: Rotina & Manejo'}
@@ -1182,6 +1507,118 @@ export const ClientCheckIn: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Multi-Dog Session Manager */}
+                <div className="p-4 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb] space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-[#1E293B] font-bold text-xs uppercase tracking-wider">
+                      <Users className="w-4 h-4 text-[#2D3E5E]" />
+                      <span>Cães nesta Hospedagem ({bookingDogCount})</span>
+                    </div>
+                    {bookingDogCount > 1 && (
+                      <span className="text-[10px] font-bold text-[#133E26] bg-[#d2e3d8] border border-[#a3cbb1] px-2 py-0.5 rounded-full">
+                        Multiplicador ×{bookingDogCount} ativo
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {sessionBookingPets.map((draft, idx) => {
+                      const isCurrentForm = draft.localKey === activeDraftKey;
+                      return (
+                        <div
+                          key={draft.localKey}
+                          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+                            isCurrentForm
+                              ? 'bg-white border-[#92a8d1]'
+                              : 'bg-white/80 border-[#dec2cb]/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {draft.photoUrl ? (
+                              <img
+                                src={draft.photoUrl}
+                                alt={draft.nameAndBreed || `Cão ${idx + 1}`}
+                                className="w-9 h-9 rounded-lg object-cover border border-[#dec2cb] shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-[#c5b9cd]/30 border border-[#dec2cb] flex items-center justify-center shrink-0">
+                                <Dog className="w-4 h-4 text-[#2D3E5E]" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-[#1E293B] truncate">
+                                {draft.nameAndBreed.trim() || `Cão ${idx + 1} (preencher nome)`}
+                              </p>
+                              <p className="text-[11px] text-[#64748B] truncate">
+                                {draft.ageAndWeight.trim() || 'Detalhes pendentes'}
+                                {isCurrentForm ? ' • Em edição' : ''}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {!isCurrentForm && (
+                              <button
+                                type="button"
+                                onClick={() => handleEditQueuedPet(draft.localKey)}
+                                className="min-h-[36px] px-2.5 rounded-lg bg-[#FAF8F9] hover:bg-[#c5b9cd]/30 border border-[#dec2cb] text-[11px] font-bold text-[#1E293B] transition cursor-pointer"
+                              >
+                                Editar
+                              </button>
+                            )}
+                            {sessionBookingPets.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSessionPet(draft.localKey)}
+                                className="min-h-[36px] min-w-[36px] rounded-lg bg-[#FEE2E2] hover:bg-[#FCA5A5] text-[#991B1B] border border-[#FECACA] flex items-center justify-center transition cursor-pointer"
+                                title="Remover este cão da reserva"
+                                aria-label="Remover este cão da reserva"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Add already-registered siblings (for returning tutors) */}
+                  {existingPets.some(
+                    (ep) => !sessionBookingPets.some((sp) => sp.existingPetId === ep.id)
+                  ) && (
+                    <div className="pt-1 space-y-1.5">
+                      <span className="text-[10px] font-bold text-[#64748B] uppercase block">
+                        Incluir outro cão já cadastrado:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {existingPets
+                          .filter((ep) => !sessionBookingPets.some((sp) => sp.existingPetId === ep.id))
+                          .map((sibling) => (
+                            <button
+                              key={sibling.id}
+                              type="button"
+                              onClick={() => handleAddExistingSiblingToSession(sibling)}
+                              className="min-h-[38px] px-3 rounded-xl bg-white hover:bg-[#92a8d1]/20 border border-[#92a8d1] text-[11px] font-bold text-[#1E293B] flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <PlusCircle className="w-3.5 h-3.5 text-[#2D3E5E]" />
+                              <span>{sibling.nameAndBreed}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleAddAnotherDogInSession}
+                    className="w-full min-h-[48px] px-4 rounded-xl border border-dashed border-[#92a8d1] bg-white hover:bg-[#92a8d1]/15 text-[#1E293B] text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4 text-[#2D3E5E]" />
+                    <span>+ Adicionar Outro Cão nesta Estadia</span>
+                  </button>
+                </div>
+
                 {/* Stay Check-in Details */}
                 <div className="space-y-3 pt-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1242,13 +1679,13 @@ export const ClientCheckIn: React.FC = () => {
 
                   {/* Live 24h Cycle Pricing Quote Card */}
                   <div className="rounded-2xl border border-[#dec2cb] bg-white overflow-hidden shadow-xs transition">
-                    <div className="bg-gradient-to-r from-[#f7cac9] via-[#c5b9cd] to-[#92a8d1] px-4 py-2.5 flex items-center justify-between">
+                    <div className="bg-gradient-to-r from-[#f7cac9] via-[#c5b9cd] to-[#92a8d1] px-4 py-2.5 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 text-[#1E293B] font-bold text-xs uppercase tracking-wider">
                         <Calculator className="w-4 h-4 text-[#2D3E5E]" />
                         <span>Resumo do Valor da Hospedagem</span>
                       </div>
-                      <span className="text-[10px] font-bold text-[#1E293B] bg-white/70 px-2 py-0.5 rounded-full border border-white/80">
-                        Ciclos de 24h
+                      <span className="text-[10px] font-bold text-[#1E293B] bg-white/70 px-2 py-0.5 rounded-full border border-white/80 shrink-0">
+                        {bookingDogCount > 1 ? `${bookingDogCount} cães • 24h` : 'Ciclos de 24h'}
                       </span>
                     </div>
 
@@ -1273,7 +1710,7 @@ export const ClientCheckIn: React.FC = () => {
                           {/* Step-by-step breakdown list */}
                           <div className="space-y-1.5 text-xs">
                             <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
-                              Detalhamento dos Ciclos:
+                              Detalhamento dos Ciclos {livePricingQuote.dogCount > 1 ? '(por cão)' : ''}:
                             </span>
                             {livePricingQuote.cyclesBreakdown.map((cycle, idx) => (
                               <div
@@ -1294,18 +1731,27 @@ export const ClientCheckIn: React.FC = () => {
                           </div>
 
                           {/* Total Value */}
-                          <div className="pt-2 border-t border-[#dec2cb]/60 flex items-center justify-between">
+                          <div className="pt-2 border-t border-[#dec2cb]/60 flex items-center justify-between gap-2">
                             <div>
                               <span className="text-xs font-bold text-[#64748B] block">
-                                Valor Total Estimado
+                                {livePricingQuote.dogCount > 1
+                                  ? `Valor Total (${livePricingQuote.dogCount} cães)`
+                                  : 'Valor Total Estimado'}
                               </span>
-                              <span className="text-[10px] text-[#64748B]">
-                                Seg-Qui: R$ 79 • Sex-Dom: R$ 89 • Feriados/Alta: R$ 120
-                              </span>
+                              {livePricingQuote.dogCount > 1 ? (
+                                <span className="text-[11px] font-bold text-[#2D3E5E] tabular-nums block">
+                                  {formatBRL(livePricingQuote.unitStayPrice)} × {livePricingQuote.dogCount} cães ={' '}
+                                  {formatBRL(livePricingQuote.totalPrice)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-[#64748B]">
+                                  Seg-Qui: R$ 79 • Sex-Dom: R$ 89 • Feriados/Alta: R$ 120
+                                </span>
+                              )}
                             </div>
-                            <div className="text-right">
-                              <span className="text-lg font-black text-[#1E293B] text-right block">
-                                {formatBRL(livePricingQuote.estimatedTotal)}
+                            <div className="text-right shrink-0">
+                              <span className="text-lg font-black text-[#1E293B] text-right block tabular-nums">
+                                {formatBRL(livePricingQuote.totalPrice)}
                               </span>
                             </div>
                           </div>
@@ -1469,18 +1915,30 @@ export const ClientCheckIn: React.FC = () => {
             <span className="text-[10px] font-bold tracking-widest text-[#133E26] bg-[#d2e3d8] px-2.5 py-1 rounded-full uppercase border border-[#a3cbb1]">
               Check-in Confirmado
             </span>
-            <h2 className="text-xl sm:text-2xl font-black text-[#1E293B] mt-2">Ficha Salva no Sistema!</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-[#1E293B] mt-2">
+              {submissionSuccessData.pets.length > 1
+                ? `Fichas de ${submissionSuccessData.pets.length} Cães Salvas!`
+                : 'Ficha Salva no Sistema!'}
+            </h2>
             <p className="text-xs sm:text-sm text-[#64748B] max-w-md mx-auto mt-1 leading-relaxed">
-              Os dados de <strong>{submissionSuccessData.pet.nameAndBreed}</strong> foram salvos e a equipe Mika &amp; Xan já tem acesso à ficha completa.
+              Os dados de{' '}
+              <strong>
+                {submissionSuccessData.pets.map((p) => p.nameAndBreed).join(', ')}
+              </strong>{' '}
+              foram salvos e a equipe Mika &amp; Xan já tem acesso à ficha completa.
             </p>
           </div>
 
           {/* Voucher Summary Card */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF8F9] border border-[#dec2cb]/60 text-left space-y-2.5 text-xs">
-            <div className="flex justify-between border-b border-[#dec2cb]/60 pb-2">
-              <span className="text-[#64748B]">Pet:</span>
-              <span className="font-bold text-[#1E293B]">
-                {submissionSuccessData.pet.nameAndBreed}
+            <div className="flex justify-between gap-2 border-b border-[#dec2cb]/60 pb-2">
+              <span className="text-[#64748B] shrink-0">
+                {submissionSuccessData.pets.length > 1
+                  ? `Pets (${submissionSuccessData.pets.length} cães):`
+                  : 'Pet:'}
+              </span>
+              <span className="font-bold text-[#1E293B] text-right">
+                {submissionSuccessData.pets.map((p) => p.nameAndBreed).join(', ')}
               </span>
             </div>
             <div className="flex justify-between border-b border-[#dec2cb]/60 pb-2">
@@ -1502,9 +1960,20 @@ export const ClientCheckIn: React.FC = () => {
               </span>
             </div>
             {submissionSuccessData.stay.estimatedTotal !== undefined && (
-              <div className="flex justify-between border-b border-[#dec2cb]/60 pb-2 bg-[#92a8d1]/10 px-2 py-1.5 rounded-lg">
-                <span className="text-[#1E293B] font-semibold">Valor Estimado ({submissionSuccessData.stay.totalHours}h):</span>
-                <span className="font-black text-[#1E293B]">
+              <div className="flex items-center justify-between gap-2 border-b border-[#dec2cb]/60 pb-2 bg-[#92a8d1]/10 px-2 py-1.5 rounded-lg">
+                <div>
+                  <span className="text-[#1E293B] font-semibold block">
+                    Valor Estimado ({submissionSuccessData.stay.totalHours}h):
+                  </span>
+                  {(submissionSuccessData.stay.dogCount || 1) > 1 &&
+                    submissionSuccessData.stay.pricingBreakdown?.unitStayPrice !== undefined && (
+                      <span className="text-[11px] font-bold text-[#2D3E5E] tabular-nums">
+                        {formatBRL(submissionSuccessData.stay.pricingBreakdown.unitStayPrice)} ×{' '}
+                        {submissionSuccessData.stay.dogCount} cães
+                      </span>
+                    )}
+                </div>
+                <span className="font-black text-[#1E293B] tabular-nums">
                   {formatBRL(submissionSuccessData.stay.estimatedTotal)}
                 </span>
               </div>
@@ -1526,6 +1995,8 @@ export const ClientCheckIn: React.FC = () => {
                 setFormData(INITIAL_FORM_STATE);
                 setLookupPhone('');
                 setSelectedPetId(null);
+                setSelectedExistingPetIds([]);
+                setQueuedPets([]);
                 setSubmissionSuccessData(null);
                 setDateConfirmationChecked(false);
                 setStepTransitionLock(false);

@@ -10,8 +10,11 @@ import {
   where,
   getDocs,
   deleteDoc,
+  updateDoc,
   doc,
+  deepCleanUndefined,
 } from '@/lib/firebase';
+import { calculateStayPricing } from '@/lib/pricingCalculator';
 
 export interface CascadeDeleteResult {
   success: boolean;
@@ -33,16 +36,66 @@ export async function cascadeDeletePet(
   }
 
   try {
-    // 1. Query and delete all stays linked to this pet
-    const staysQuery = query(collection(db, 'stays'), where('petId', '==', petId));
-    const staysSnap = await getDocs(staysQuery);
+    // 1. Query all stays linked via primary petId or petIds array
+    const [primarySnap, multiSnap] = await Promise.all([
+      getDocs(query(collection(db, 'stays'), where('petId', '==', petId))),
+      getDocs(query(collection(db, 'stays'), where('petIds', 'array-contains', petId))),
+    ]);
 
-    const deleteStayPromises: Promise<void>[] = [];
-    staysSnap.forEach((stayDoc: any) => {
-      deleteStayPromises.push(deleteDoc(doc(db, 'stays', stayDoc.id)));
+    const stayDocsMap = new Map<string, any>();
+    primarySnap.forEach((d: any) => stayDocsMap.set(d.id, d.data()));
+    multiSnap.forEach((d: any) => stayDocsMap.set(d.id, d.data()));
+
+    const stayMutations: Promise<void>[] = [];
+    let staysDeleted = 0;
+
+    stayDocsMap.forEach((stayData, stayId) => {
+      const petIds: string[] = Array.isArray(stayData?.petIds)
+        ? stayData.petIds.filter((id: string) => id && id !== petId)
+        : [];
+
+      if (petIds.length > 0) {
+        const nextDogCount = petIds.length;
+        const inParts = stayData.checkInDate?.includes('T')
+          ? stayData.checkInDate.split('T')
+          : [stayData.checkInDate || '', '10:00'];
+        const outParts = stayData.checkOutDate?.includes('T')
+          ? stayData.checkOutDate.split('T')
+          : [stayData.checkOutDate || '', '10:00'];
+        const nextPricing =
+          inParts[0] && outParts[0]
+            ? calculateStayPricing(
+                inParts[0],
+                inParts[1].slice(0, 5),
+                outParts[0],
+                outParts[1].slice(0, 5),
+                nextDogCount
+              )
+            : null;
+
+        stayMutations.push(
+          updateDoc(
+            doc(db, 'stays', stayId),
+            deepCleanUndefined({
+              petId: petIds[0],
+              petIds,
+              dogCount: nextDogCount,
+              ...(nextPricing
+                ? {
+                    estimatedTotal: nextPricing.totalPrice,
+                    pricingBreakdown: nextPricing,
+                  }
+                : {}),
+            })
+          )
+        );
+      } else {
+        staysDeleted += 1;
+        stayMutations.push(deleteDoc(doc(db, 'stays', stayId)));
+      }
     });
-    await Promise.all(deleteStayPromises);
-    const staysDeleted = staysSnap.size || 0;
+
+    await Promise.all(stayMutations);
 
     // 2. Delete pet document
     await deleteDoc(doc(db, 'pets', petId));

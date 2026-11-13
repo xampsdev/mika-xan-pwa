@@ -222,6 +222,9 @@ export async function getDocs(queryOrColRef: any): Promise<any> {
           if (f.op === '==' || f.op === '===') {
             return String(item[f.field] || '').trim() === String(f.value || '').trim();
           }
+          if (f.op === 'array-contains') {
+            return Array.isArray(item[f.field]) && item[f.field].includes(f.value);
+          }
           return true;
         });
       });
@@ -316,6 +319,9 @@ export function onSnapshot(
             return target.filters.every((f: any) => {
               if (f.op === '==' || f.op === '===') {
                 return String(item[f.field] || '').trim() === String(f.value || '').trim();
+              }
+              if (f.op === 'array-contains') {
+                return Array.isArray(item[f.field]) && item[f.field].includes(f.value);
               }
               return true;
             });

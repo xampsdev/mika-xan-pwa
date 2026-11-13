@@ -516,7 +516,7 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // PetId -> Current Active or Pending Stay
+  // PetId -> Current Active or Pending Stay (handles single & multi-dog stays)
   const petLatestStayMap = useMemo(() => {
     const map = new Map<string, Stay>();
     const sorted = [...stays].sort(
@@ -524,14 +524,22 @@ export const AdminDashboard: React.FC = () => {
     );
 
     sorted.forEach((stay) => {
-      if (!map.has(stay.petId)) {
-        map.set(stay.petId, stay);
-      } else {
-        const existing = map.get(stay.petId)!;
-        if (existing.status === 'completed' && (stay.status === 'active' || stay.status === 'pending')) {
-          map.set(stay.petId, stay);
+      const associatedPetIds = Array.from(
+        new Set(
+          [stay.petId, ...(Array.isArray(stay.petIds) ? stay.petIds : [])].filter(Boolean)
+        )
+      );
+
+      associatedPetIds.forEach((pId) => {
+        if (!map.has(pId)) {
+          map.set(pId, stay);
+        } else {
+          const existing = map.get(pId)!;
+          if (existing.status === 'completed' && (stay.status === 'active' || stay.status === 'pending')) {
+            map.set(pId, stay);
+          }
         }
-      }
+      });
     });
     return map;
   }, [stays]);
@@ -1239,11 +1247,27 @@ export const AdminDashboard: React.FC = () => {
                             ).toLocaleDateString('pt-BR')}
                           </strong>
                         </p>
-                        {(latestStay.finalTotal !== undefined || latestStay.estimatedTotal !== undefined) && (
-                          <span className="text-[10px] font-black text-[#1E293B] bg-[#92a8d1]/30 border border-[#dec2cb] px-2 py-0.5 rounded-md shrink-0 ml-1">
-                            {formatBRL(latestStay.finalTotal ?? latestStay.estimatedTotal ?? 0)}
-                          </span>
-                        )}
+                        {(() => {
+                          const stayDogCount =
+                            latestStay.dogCount ||
+                            latestStay.pricingBreakdown?.dogCount ||
+                            (latestStay.petIds && latestStay.petIds.length > 0 ? latestStay.petIds.length : 1);
+
+                          return (
+                            (latestStay.finalTotal !== undefined || latestStay.estimatedTotal !== undefined) && (
+                              <div className="flex items-center gap-1 shrink-0 ml-1">
+                                {stayDogCount > 1 && (
+                                  <span className="text-[10px] font-bold text-[#2D3E5E] bg-[#f7cac9]/70 border border-[#dec2cb] px-1.5 py-0.5 rounded-md">
+                                    {stayDogCount} cães
+                                  </span>
+                                )}
+                                <span className="text-[10px] font-black text-[#1E293B] bg-[#92a8d1]/30 border border-[#dec2cb] px-2 py-0.5 rounded-md tabular-nums">
+                                  {formatBRL(latestStay.finalTotal ?? latestStay.estimatedTotal ?? 0)}
+                                </span>
+                              </div>
+                            )
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

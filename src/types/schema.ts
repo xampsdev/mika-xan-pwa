@@ -145,6 +145,9 @@ export interface StayPricingCalculation {
   fullCycles: number;
   extraHours: number;
   overtimeType: 'none' | 'tolerance' | 'half_day' | 'full_day';
+  unitStayPrice: number;
+  dogCount: number;
+  totalPrice: number;
   estimatedTotal: number;
   hasHalfDay: boolean;
   fullDaysCount: number;
@@ -160,8 +163,14 @@ export interface Stay {
   /** Firestore Document ID */
   id: string;
 
-  /** Foreign Key referencing Pet.id */
+  /** Foreign Key referencing primary Pet.id (kept for backward compatibility) */
   petId: string;
+
+  /** All Pet IDs included in this stay (supports multi-dog bookings) */
+  petIds?: string[];
+
+  /** Number of dogs included in this stay (defaults to 1) */
+  dogCount?: number;
 
   /** Foreign Key referencing Tutor.id */
   tutorId: string;

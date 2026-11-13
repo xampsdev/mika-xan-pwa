@@ -15,6 +15,9 @@ import {
   Info,
   DollarSign,
   ArrowRight,
+  Dog,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { calculateStayPricing, formatBRL } from '@/lib/pricingCalculator';
 
@@ -40,11 +43,12 @@ export const PricingCalculatorModal: React.FC<PricingCalculatorModalProps> = ({
   const [checkOutTime, setCheckOutTime] = useState<string>('12:00');
 
   const [petName, setPetName] = useState<string>('');
+  const [dogCount, setDogCount] = useState<number>(1);
   const [copied, setCopied] = useState<boolean>(false);
 
   const pricing = useMemo(() => {
-    return calculateStayPricing(checkInDate, checkInTime, checkOutDate, checkOutTime);
-  }, [checkInDate, checkInTime, checkOutDate, checkOutTime]);
+    return calculateStayPricing(checkInDate, checkInTime, checkOutDate, checkOutTime, dogCount);
+  }, [checkInDate, checkInTime, checkOutDate, checkOutTime, dogCount]);
 
   if (!isOpen) return null;
 
@@ -107,12 +111,19 @@ export const PricingCalculatorModal: React.FC<PricingCalculatorModalProps> = ({
       .map((c) => `  • ${c.description}: ${c.rate === 0 ? 'Cortesia' : formatBRL(c.rate)}`)
       .join('\n');
 
+    const totalSection =
+      pricing.dogCount > 1
+        ? `🐕 *Quantidade:* ${pricing.dogCount} cães\n` +
+          `💵 *Valor por Cão:* ${formatBRL(pricing.unitStayPrice)}\n` +
+          `💰 *Valor Total (${pricing.dogCount} cães):* *${formatBRL(pricing.totalPrice)}*\n\n`
+        : `💰 *Valor Total:* *${formatBRL(pricing.totalPrice)}*\n\n`;
+
     const message = `🐾 *Orçamento Hospedagem Mika & Xan*${petText}\n\n` +
       `📅 *Entrada:* ${inFormatted} às ${checkInTime}\n` +
       `📅 *Saída:* ${outFormatted} às ${checkOutTime}\n` +
       `⏱️ *Duração Total:* ${pricing.totalHours}h (${pricing.summaryText})\n\n` +
-      `📋 *Composição dos Ciclos de 24h:*\n${cyclesText}\n\n` +
-      `💰 *Valor Total:* *${formatBRL(pricing.estimatedTotal)}*\n\n` +
+      `📋 *Composição dos Ciclos de 24h (por cão):*\n${cyclesText}\n\n` +
+      totalSection +
       `✨ *Diferenciais inclusos:*\n` +
       `• Supervisão familiar 24 horas no lar\n` +
       `• Rotina individualizada de alimentação e passeios\n` +
@@ -187,18 +198,49 @@ export const PricingCalculatorModal: React.FC<PricingCalculatorModalProps> = ({
             </div>
           </div>
 
-          {/* Optional Pet Name for WhatsApp copy */}
-          <div>
-            <label className="block text-xs font-bold text-[#1E293B] mb-1">
-              Nome do Pet (Opcional, para o WhatsApp)
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Thor, Mel, Pipoca..."
-              value={petName}
-              onChange={(e) => setPetName(e.target.value)}
-              className="w-full min-h-[44px] bg-[#FAF8F9] border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] focus:bg-white rounded-xl px-3.5 py-2 text-sm text-[#1E293B]"
-            />
+          {/* Optional Pet Name & Dog Count Stepper */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-[#1E293B] mb-1">
+                Nome(s) do(s) Pet(s) (Opcional, para o WhatsApp)
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Thor, Mel, Pipoca..."
+                value={petName}
+                onChange={(e) => setPetName(e.target.value)}
+                className="w-full min-h-[44px] bg-[#FAF8F9] border border-[#c5b9cd] focus:ring-2 focus:ring-[#92a8d1] focus:border-[#92a8d1] focus:bg-white rounded-xl px-3.5 py-2 text-sm text-[#1E293B]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#1E293B] mb-1">
+                Qtd. de Cães
+              </label>
+              <div className="flex items-center justify-between bg-[#FAF8F9] border border-[#c5b9cd] rounded-xl p-1 min-h-[44px]">
+                <button
+                  type="button"
+                  onClick={() => setDogCount((c) => Math.max(1, c - 1))}
+                  disabled={dogCount <= 1}
+                  className="min-w-[38px] min-h-[38px] rounded-lg bg-white hover:bg-[#c5b9cd]/20 disabled:opacity-40 border border-[#dec2cb] text-[#1E293B] flex items-center justify-center transition cursor-pointer"
+                  aria-label="Diminuir quantidade de cães"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-sm font-black text-[#1E293B] tabular-nums flex items-center gap-1 px-2">
+                  <Dog className="w-3.5 h-3.5 text-[#2D3E5E]" />
+                  {dogCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDogCount((c) => Math.min(10, c + 1))}
+                  className="min-w-[38px] min-h-[38px] rounded-lg bg-white hover:bg-[#c5b9cd]/20 border border-[#dec2cb] text-[#1E293B] flex items-center justify-center transition cursor-pointer"
+                  aria-label="Aumentar quantidade de cães"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Date & Time Selectors */}
@@ -290,13 +332,23 @@ export const PricingCalculatorModal: React.FC<PricingCalculatorModalProps> = ({
                 </div>
 
                 {/* Grand Total */}
-                <div className="pt-2 border-t border-[#dec2cb]/60 flex items-center justify-between">
+                <div className="pt-2 border-t border-[#dec2cb]/60 flex items-center justify-between gap-2">
                   <div>
-                    <span className="text-xs font-bold text-[#64748B] block">Valor Calculado</span>
-                    <span className="text-[10px] text-[#64748B]">Tabela vigente 24h</span>
+                    <span className="text-xs font-bold text-[#64748B] block">
+                      {pricing.dogCount > 1
+                        ? `Valor Total (${pricing.dogCount} cães)`
+                        : 'Valor Calculado'}
+                    </span>
+                    {pricing.dogCount > 1 ? (
+                      <span className="text-[11px] font-bold text-[#2D3E5E] tabular-nums">
+                        {formatBRL(pricing.unitStayPrice)} × {pricing.dogCount} cães = {formatBRL(pricing.totalPrice)}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[#64748B]">Tabela vigente 24h</span>
+                    )}
                   </div>
-                  <span className="text-2xl font-black text-[#1E293B]">
-                    {formatBRL(pricing.estimatedTotal)}
+                  <span className="text-2xl font-black text-[#1E293B] tabular-nums">
+                    {formatBRL(pricing.totalPrice)}
                   </span>
                 </div>
               </div>
