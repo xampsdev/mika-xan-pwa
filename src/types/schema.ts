@@ -169,6 +169,9 @@ export interface Stay {
   /** All Pet IDs included in this stay (supports multi-dog bookings) */
   petIds?: string[];
 
+  /** Cached names/breeds of all pets included in this stay */
+  petNames?: string[];
+
   /** Number of dogs included in this stay (defaults to 1) */
   dogCount?: number;
 

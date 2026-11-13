@@ -50,6 +50,7 @@ import type { Pet, Tutor, Stay, StayStatus } from '@/types/schema';
 
 interface PetDetailModalProps {
   pet: Pet | null;
+  allPets?: Pet[];
   tutor: Tutor | null;
   isOpen: boolean;
   onClose: () => void;
@@ -59,6 +60,7 @@ interface PetDetailModalProps {
 
 export const PetDetailModal: React.FC<PetDetailModalProps> = ({
   pet,
+  allPets = [],
   tutor,
   isOpen,
   onClose,
@@ -1437,6 +1439,33 @@ export const PetDetailModal: React.FC<PetDetailModalProps> = ({
                                 Saída: {new Date(stay.checkOutDate).toLocaleString('pt-BR')}
                               </span>
                             </div>
+
+                            {(() => {
+                              const stayDogCount =
+                                stay.dogCount ||
+                                stay.pricingBreakdown?.dogCount ||
+                                (stay.petIds && stay.petIds.length > 0 ? stay.petIds.length : 1);
+
+                              const resolvedPetNames =
+                                Array.isArray(stay.petIds) && stay.petIds.length > 0
+                                  ? stay.petIds
+                                      .map(
+                                        (id, idx) =>
+                                          allPets.find((p) => p.id === id)?.nameAndBreed ||
+                                          (id === pet.id ? pet.nameAndBreed : undefined) ||
+                                          stay.petNames?.[idx]
+                                      )
+                                      .filter(Boolean)
+                                  : stay.petNames && stay.petNames.length > 0
+                                    ? stay.petNames
+                                    : [pet.nameAndBreed];
+
+                              return stayDogCount > 1 ? (
+                                <p className="text-[11px] font-bold text-[#2D3E5E]">
+                                  Pets ({stayDogCount} cães): {resolvedPetNames.join(', ')}
+                                </p>
+                              ) : null;
+                            })()}
 
                             {stay.specialStayNotes && (
                               <p className="text-xs text-[#64748B] italic">

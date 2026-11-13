@@ -544,6 +544,12 @@ export const AdminDashboard: React.FC = () => {
     return map;
   }, [stays]);
 
+  const petsByIdMap = useMemo(() => {
+    const map = new Map<string, Pet>();
+    pets.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [pets]);
+
   // Filtered & Searched Pets
   const filteredPets = useMemo(() => {
     return pets.filter((pet) => {
@@ -690,6 +696,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Detail Modal Component */}
       <PetDetailModal
         pet={selectedPet}
+        allPets={pets}
         tutor={selectedPet ? tutors.get(selectedPet.tutorId) || null : null}
         isOpen={isDetailModalOpen}
         onClose={() => {
@@ -1237,24 +1244,33 @@ export const AdminDashboard: React.FC = () => {
                         🥣 Ração: <span className="text-[#1E293B] font-medium">{pet.foodAmountAndSchedule}</span>
                       </p>
                     )}
-                    {latestStay && (
-                      <div className="flex items-center justify-between text-[11px] text-[#64748B]">
-                        <p className="truncate">
-                          🗓️ {isActive ? 'Saída prevista' : 'Check-in'}:{' '}
-                          <strong className="text-[#1E293B]">
-                            {new Date(
-                              isActive ? latestStay.checkOutDate : latestStay.checkInDate
-                            ).toLocaleDateString('pt-BR')}
-                          </strong>
-                        </p>
-                        {(() => {
-                          const stayDogCount =
-                            latestStay.dogCount ||
-                            latestStay.pricingBreakdown?.dogCount ||
-                            (latestStay.petIds && latestStay.petIds.length > 0 ? latestStay.petIds.length : 1);
+                    {latestStay && (() => {
+                      const stayDogCount =
+                        latestStay.dogCount ||
+                        latestStay.pricingBreakdown?.dogCount ||
+                        (latestStay.petIds && latestStay.petIds.length > 0 ? latestStay.petIds.length : 1);
 
-                          return (
-                            (latestStay.finalTotal !== undefined || latestStay.estimatedTotal !== undefined) && (
+                      const resolvedStayPetNames =
+                        Array.isArray(latestStay.petIds) && latestStay.petIds.length > 0
+                          ? latestStay.petIds
+                              .map((id, idx) => petsByIdMap.get(id)?.nameAndBreed || latestStay.petNames?.[idx])
+                              .filter(Boolean)
+                          : latestStay.petNames && latestStay.petNames.length > 0
+                            ? latestStay.petNames
+                            : [pet.nameAndBreed];
+
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+                            <p className="truncate">
+                              🗓️ {isActive ? 'Saída prevista' : 'Check-in'}:{' '}
+                              <strong className="text-[#1E293B]">
+                                {new Date(
+                                  isActive ? latestStay.checkOutDate : latestStay.checkInDate
+                                ).toLocaleDateString('pt-BR')}
+                              </strong>
+                            </p>
+                            {(latestStay.finalTotal !== undefined || latestStay.estimatedTotal !== undefined) && (
                               <div className="flex items-center gap-1 shrink-0 ml-1">
                                 {stayDogCount > 1 && (
                                   <span className="text-[10px] font-bold text-[#2D3E5E] bg-[#f7cac9]/70 border border-[#dec2cb] px-1.5 py-0.5 rounded-md">
@@ -1265,11 +1281,16 @@ export const AdminDashboard: React.FC = () => {
                                   {formatBRL(latestStay.finalTotal ?? latestStay.estimatedTotal ?? 0)}
                                 </span>
                               </div>
-                            )
-                          );
-                        })()}
-                      </div>
-                    )}
+                            )}
+                          </div>
+                          {stayDogCount > 1 && resolvedStayPetNames.length > 0 && (
+                            <p className="text-[10px] text-[#2D3E5E] font-semibold truncate">
+                              Reserva conjunta ({stayDogCount}): {resolvedStayPetNames.join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
