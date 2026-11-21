@@ -225,6 +225,9 @@ export async function getDocs(queryOrColRef: any): Promise<any> {
           if (f.op === 'array-contains') {
             return Array.isArray(item[f.field]) && item[f.field].includes(f.value);
           }
+          if (f.op === 'in') {
+            return Array.isArray(f.value) && f.value.includes(item[f.field]);
+          }
           return true;
         });
       });
@@ -322,6 +325,9 @@ export function onSnapshot(
               }
               if (f.op === 'array-contains') {
                 return Array.isArray(item[f.field]) && item[f.field].includes(f.value);
+              }
+              if (f.op === 'in') {
+                return Array.isArray(f.value) && f.value.includes(item[f.field]);
               }
               return true;
             });

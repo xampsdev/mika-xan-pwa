@@ -36,12 +36,14 @@ import {
   Trash2,
   Users,
   Copy,
+  CalendarDays,
 } from 'lucide-react';
 import { formatBrazilianPhone, isValidBrazilianPhone } from '@/utils/phone';
 import { compressImageToDataUrl } from '@/utils/imageCompression';
 import { sendNtfyAlert } from '@/lib/ntfy';
 import { calculateStayPricing, formatBRL } from '@/lib/pricingCalculator';
 import { ImageLightboxModal } from '@/components/ImageLightboxModal';
+import { ClientReservations } from '@/components/ClientReservations';
 import type { Tutor, Pet, Stay, StayStatus } from '@/types/schema';
 
 interface PetFormEntry {
@@ -70,7 +72,12 @@ interface PetFormEntry {
   selectedImageFile: File | null;
 }
 
-type FlowStage = 'phone_lookup' | 'returning_client' | 'intake_form' | 'success_confirmation';
+type FlowStage =
+  | 'phone_lookup'
+  | 'returning_client'
+  | 'my_reservations'
+  | 'intake_form'
+  | 'success_confirmation';
 type FormSubStep = 'tutor_vet' | 'pet_health' | 'behavior_routine' | 'photo_stay';
 
 interface TutorStayFormState {
@@ -582,6 +589,7 @@ export const ClientCheckIn: React.FC = () => {
         specialStayNotes: (formData.specialStayNotes || '').trim(),
         estimatedTotal: pricing?.totalPrice ?? 0,
         finalTotal: pricing?.totalPrice ?? 0,
+        totalPrice: pricing?.totalPrice ?? 0,
         totalHours: pricing?.totalHours ?? 0,
         ...(cleanedPricingBreakdown ? { pricingBreakdown: cleanedPricingBreakdown } : {}),
         createdAt: serverTimestamp(),
@@ -589,8 +597,23 @@ export const ClientCheckIn: React.FC = () => {
 
       const stayRef = await addDoc(collection(db, 'stays'), deepCleanUndefined(stayPayload));
 
+      const hydratedTutor: Tutor = {
+        id: resolvedTutorId,
+        ...tutorPayload,
+        createdAt: new Date(),
+      };
+
+      // Keep identified client session active so tutor can open "Minhas Reservas" immediately
+      setExistingTutor(hydratedTutor);
+      setExistingPets((prev) => {
+        const byId = new Map<string, Pet>();
+        prev.forEach((p) => byId.set(p.id, p));
+        savedPets.forEach((p) => byId.set(p.id, p));
+        return Array.from(byId.values());
+      });
+
       setSubmissionSuccessData({
-        tutor: { id: resolvedTutorId, ...tutorPayload, createdAt: new Date() },
+        tutor: hydratedTutor,
         pet: savedPets[0],
         pets: savedPets,
         stay: {
@@ -718,14 +741,35 @@ export const ClientCheckIn: React.FC = () => {
             </div>
 
             <button
+              type="button"
               onClick={() => {
                 setStage('phone_lookup');
                 setExistingTutor(null);
                 setExistingPets([]);
               }}
-              className="text-xs font-bold text-[#1E293B] underline underline-offset-2 hover:opacity-80 self-start sm:self-auto min-h-[44px] flex items-center"
+              className="text-xs font-bold text-[#1E293B] underline underline-offset-2 hover:opacity-80 self-start sm:self-auto min-h-[44px] flex items-center cursor-pointer"
             >
               Trocar Telefone
+            </button>
+          </div>
+
+          {/* Client Portal Switcher: Novo Check-in | Minhas Reservas */}
+          <div className="grid grid-cols-2 gap-1.5 p-1.5 rounded-2xl bg-[#F3EFF2] border border-[#dec2cb]/70">
+            <button
+              type="button"
+              onClick={() => setStage('returning_client')}
+              className="min-h-[44px] px-3 rounded-xl bg-[#92a8d1] text-[#1E293B] border border-[#7b93c2] shadow-sm text-xs font-bold flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+            >
+              <Dog className="w-4 h-4 shrink-0" />
+              <span>Novo Check-in</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStage('my_reservations')}
+              className="min-h-[44px] px-3 rounded-xl bg-transparent hover:bg-white/70 text-[#475569] hover:text-[#1E293B] border border-transparent text-xs font-bold flex items-center justify-center gap-1.5 whitespace-nowrap transition cursor-pointer"
+            >
+              <CalendarDays className="w-4 h-4 shrink-0" />
+              <span>Minhas Reservas</span>
             </button>
           </div>
 
@@ -864,6 +908,26 @@ export const ClientCheckIn: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          STAGE 2B: Client Reservations Portal ("Minhas Reservas")
+      ───────────────────────────────────────────────────────────── */}
+      {stage === 'my_reservations' && existingTutor && (
+        <ClientReservations
+          tutor={existingTutor}
+          pets={existingPets}
+          onNewBooking={() => {
+            setSelectedExistingPetIds([]);
+            setStage('returning_client');
+          }}
+          onSwitchPhone={() => {
+            setStage('phone_lookup');
+            setExistingTutor(null);
+            setExistingPets([]);
+            setSelectedExistingPetIds([]);
+          }}
+        />
       )}
 
       {/* ─────────────────────────────────────────────────────────────
@@ -2024,8 +2088,24 @@ export const ClientCheckIn: React.FC = () => {
             </div>
           </div>
 
-          {/* Return / Register Another Pet Action */}
-          <div className="flex justify-center pt-2">
+          {/* Post-Submission Actions: Minhas Reservas & Return */}
+          <div className="flex flex-col sm:flex-row justify-center gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setFormData(INITIAL_TUTOR_STAY_STATE);
+                setSelectedExistingPetIds([]);
+                setPetsList([createEmptyPetEntry(1)]);
+                setDateConfirmationChecked(false);
+                setStepTransitionLock(false);
+                setStage('my_reservations');
+              }}
+              className="w-full sm:w-auto min-h-[48px] px-5 rounded-xl bg-[#92a8d1] hover:bg-[#7e96c4] border border-[#7b93c2] text-[#1E293B] font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+            >
+              <CalendarDays className="w-4 h-4 text-[#1E293B]" />
+              <span>Ver Minhas Reservas</span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
@@ -2038,7 +2118,7 @@ export const ClientCheckIn: React.FC = () => {
                 setDateConfirmationChecked(false);
                 setStepTransitionLock(false);
               }}
-              className="w-full sm:w-auto min-w-[260px] min-h-[48px] px-6 rounded-xl bg-[#2D3E5E] hover:bg-[#1E293B] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+              className="w-full sm:w-auto min-h-[48px] px-5 rounded-xl bg-[#2D3E5E] hover:bg-[#1E293B] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
             >
               <RotateCcw className="w-4 h-4 text-[#92a8d1]" />
               <span>Cadastrar Outro Pet / Início</span>

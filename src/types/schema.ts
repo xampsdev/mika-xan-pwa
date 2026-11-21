@@ -199,6 +199,9 @@ export interface Stay {
   /** Final agreed total price (editable by Admin in R$) */
   finalTotal?: number;
 
+  /** Synchronized total price alias for stay recalculations (R$) */
+  totalPrice?: number;
+
   /** Total calculated duration in hours */
   totalHours?: number;
 
@@ -210,6 +213,9 @@ export interface Stay {
 
   /** Document creation timestamp */
   createdAt: FirestoreDateTime;
+
+  /** Document last update timestamp */
+  updatedAt?: FirestoreDateTime;
 
   /** Actual check-out timestamp if completed */
   actualCheckOutDate?: string;

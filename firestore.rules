@@ -24,11 +24,27 @@ service cloud.firestore {
     }
 
     // 3. Stays Collection (Check-in History)
-    // Clients can create new stays if status is 'pending'.
-    // Read, update (check-in/check-out completion), and delete restricted strictly to admins.
+    // Clients can read stays (filtered by tutorId in portal), create pending stays,
+    // and edit ONLY check-in/out dates and recalculated pricing on pending stays.
+    // Status transitions, admin notes, and deletion remain restricted strictly to admins.
     match /stays/{stayId} {
+      allow read: if true;
       allow create: if (request.resource.data.status == 'pending') || isAdmin();
-      allow read, update, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'checkInDate',
+          'checkOutDate',
+          'estimatedTotal',
+          'finalTotal',
+          'totalPrice',
+          'totalHours',
+          'pricingBreakdown',
+          'updatedAt'
+        ])
+      );
+      allow delete: if isAdmin();
     }
 
     // 4. Admin Push Tokens Collection

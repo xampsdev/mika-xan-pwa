@@ -40,12 +40,14 @@ import {
   Calculator,
   ZoomIn,
   Eye,
+  CalendarDays,
 } from 'lucide-react';
 import type { Pet, Tutor, Stay } from '@/types/schema';
 import { PetDetailModal } from '@/components/PetDetailModal';
 import { NotificationManager } from '@/components/NotificationManager';
 import { PricingCalculatorModal } from '@/components/PricingCalculatorModal';
 import { ImageLightboxModal } from '@/components/ImageLightboxModal';
+import { AdminCalendar } from '@/components/AdminCalendar';
 import { downloadGeneratedIcons } from '@/lib/pwaIconGenerator';
 import { sendNtfyAlert } from '@/lib/ntfy';
 import { cascadeDeletePet } from '@/utils/petDeletion';
@@ -128,6 +130,7 @@ export function triggerSystemNotification(stayId?: string) {
 }
 
 type FilterType = 'all' | 'active' | 'pending';
+type AdminNavTab = 'pets' | 'calendar';
 
 export const AdminDashboard: React.FC = () => {
   // Auth State (strict empty defaults, zero exposure of admin email)
@@ -166,7 +169,8 @@ export const AdminDashboard: React.FC = () => {
   const [isFromCache, setIsFromCache] = useState<boolean>(false);
   const [hasPendingWrites, setHasPendingWrites] = useState<boolean>(false);
 
-  // Search & Filter State
+  // Admin Main Navigation & Filter State
+  const [activeAdminTab, setActiveAdminTab] = useState<AdminNavTab>('pets');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<FilterType>('all');
 
@@ -1021,6 +1025,51 @@ export const AdminDashboard: React.FC = () => {
       {/* Push Notification Manager */}
       <NotificationManager adminEmail={ALLOWED_ADMIN_EMAIL} />
 
+      {/* Admin Primary Section Tabs */}
+      <nav
+        aria-label="Navegação do Painel Administrativo"
+        className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-[#F3EFF2] border border-[#dec2cb]/70 w-full sm:w-fit"
+      >
+        <button
+          type="button"
+          onClick={() => setActiveAdminTab('pets')}
+          className={`flex-1 sm:flex-initial min-h-[44px] px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition whitespace-nowrap shrink-0 cursor-pointer ${
+            activeAdminTab === 'pets'
+              ? 'bg-[#92a8d1] text-[#1E293B] border border-[#7b93c2] shadow-sm'
+              : 'text-[#64748B] hover:text-[#1E293B] border border-transparent'
+          }`}
+        >
+          <Dog className="w-4 h-4 shrink-0" />
+          <span>Pets &amp; Reservas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveAdminTab('calendar')}
+          className={`flex-1 sm:flex-initial min-h-[44px] px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition whitespace-nowrap shrink-0 cursor-pointer ${
+            activeAdminTab === 'calendar'
+              ? 'bg-[#92a8d1] text-[#1E293B] border border-[#7b93c2] shadow-sm'
+              : 'text-[#64748B] hover:text-[#1E293B] border border-transparent'
+          }`}
+        >
+          <CalendarDays className="w-4 h-4 shrink-0" />
+          <span>Calendário</span>
+        </button>
+      </nav>
+
+      {activeAdminTab === 'calendar' ? (
+        <AdminCalendar
+          stays={stays}
+          tutors={tutors}
+          pets={pets}
+          onSelectPet={(pet) => {
+            setSelectedPet(pet);
+            setIsDetailModalOpen(true);
+          }}
+          onApproveStay={handleApproveStay}
+        />
+      ) : (
+        <>
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-4 rounded-2xl bg-white border border-[#dec2cb]/60 shadow-sm">
@@ -1336,6 +1385,8 @@ export const AdminDashboard: React.FC = () => {
             );
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   );
